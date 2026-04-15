@@ -19,6 +19,10 @@
         "ACPI",
         "cpus",
         "ulonglong",
-        "Cuda"
+        "Cuda",
+        "onnx",
+        "ONNX",
+        "egui",
+        "TFLOP"
     ]
 }

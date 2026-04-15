@@ -23,5 +23,6 @@ pub trait BackendAdapter {
 
     /// Executes the generation loop. Because underlying C functions block the active OS thread entirely,
     /// implementing engines MUST push this execution to a `tokio::task::spawn_blocking` frame.
+    #[allow(async_fn_in_trait)]
     async fn evaluate_batch(&self) -> Result<usize, BackendError>;
 }

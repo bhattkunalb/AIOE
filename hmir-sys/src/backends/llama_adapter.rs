@@ -34,8 +34,7 @@ impl BackendAdapter for LlamaCppAdapter {
         Ok(())
     }
 
-    #[allow(refining_impl_trait)]
-    fn evaluate_batch(&self) -> impl std::future::Future<Output = Result<usize, BackendError>> + Send {
+    async fn evaluate_batch(&self) -> Result<usize, BackendError> {
         // Here we throw the synchronous blocking C-FFI request off the main async loop.
         // This prevents the orchestrator from deadlocking during continuous batching!
         
@@ -45,11 +44,9 @@ impl BackendAdapter for LlamaCppAdapter {
             1 // mock token return
         });
 
-        async move {
-            match exec_future.await {
-                Ok(tokens_processed) => Ok(tokens_processed),
-                Err(_) => Err(BackendError::HardwareTimeout),
-            }
+        match exec_future.await {
+            Ok(tokens_processed) => Ok(tokens_processed),
+            Err(_) => Err(BackendError::HardwareTimeout),
         }
     }
 }
