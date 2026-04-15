@@ -2,58 +2,145 @@ name: HMIR CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
-    branches: [ "main" ]
-  release:
-    types: [ published ]
+    branches: [ main ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  RUSTFLAGS: "-D warnings"
 
 jobs:
-  build:
+  # ========================================
+  # Cross-Platform Build & Test
+  # ========================================
+  test:
+    name: Test ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-    
+        rust: [stable]
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Cache Cargo Tools
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - uses: actions/checkout@v4
 
-    - name: Build Core
-      run: cargo build --verbose
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: clippy, rustfmt
 
-    - name: Run E2E Bench
-      run: cargo test -p hmir-e2e --verbose
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-    - name: Upload Build Artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: hmir-${{ matrix.os }}
-        path: target/debug/hmir*
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake pkg-config libssl-dev
 
-  publish:
-    needs: build
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install cmake pkg-config openssl
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Run tests (core only, skip heavy benchmarks)
+        run: cargo test --workspace --lib --bins --features dashboard,openai-api -- --nocapture
+
+      - name: Build release binaries
+        run: cargo build --release --workspace --features dashboard,openai-api,hardware-prober
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hmir-${{ runner.os }}-${{ matrix.rust }}
+          path: target/release/hmir*
+          retention-days: 7
+
+  # ========================================
+  # Release: Build & Publish Binaries
+  # ========================================
+  release:
+    name: Release Build
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    if: github.repository == 'bhattkunalb/HMIR' && github.event_name == 'release' && github.event.action == 'published'
+    permissions:
+      contents: write
+      packages: write
     steps:
-      - uses: actions/checkout@v3
-      
-      # Optional: Publish to crates.io
-      - name: Cargo Publish
-        run: cargo publish --features publish
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cross-compilation tools
+        run: |
+          rustup target add x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc
+
+      - name: Build release binaries (Linux)
+        run: cargo build --release --workspace --features dashboard,openai-api,hardware-prober
+
+      - name: Package binaries
+        run: |
+          mkdir -p release-artifacts
+          cp target/release/hmir-cli release-artifacts/hmir-cli-linux-x86_64
+          cp target/release/hmir-dashboard release-artifacts/hmir-dashboard-linux-x86_64
+          # Add checksums
+          cd release-artifacts && sha256sum * > SHA256SUMS.txt
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-artifacts/*
+          draft: false
+          generate_release_notes: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish to GitHub Container Registry
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+          docker build -f deploy/Dockerfile -t ghcr.io/bhattkunalb/hmir:${{ github.ref_name }} .
+          docker push ghcr.io/bhattkunalb/hmir:${{ github.ref_name }}
+
+  # ========================================
+  # Optional: Publish to crates.io (gated)
+  # ========================================
+  publish-crates:
+    name: Publish to crates.io
+    needs: release
+    if: github.event_name == 'release' && contains(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    environment: crates-publish
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish crates (in dependency order)
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        # Disabled by default, wait until crates are ready
-        continue-on-error: true
+        run: |
+          # Only run if --features publish is explicitly enabled
+          if cargo metadata --format-version 1 | jq -r '.packages[].features | .publish' | grep -q 'true'; then
+            cargo publish -p hmir-sys --allow-dirty
+            cargo publish -p hmir-core --allow-dirty
+            cargo publish -p hmir-api --allow-dirty
+            cargo publish -p hmir-cli --allow-dirty
+            echo "✅ Published to crates.io"
+          else
+            echo "⚠️ crates.io publish skipped: enable --features publish in Cargo.toml to activate"
+          fi

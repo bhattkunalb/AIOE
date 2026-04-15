@@ -2,10 +2,10 @@
 
 **Run local LLMs that automatically orchestrate NPU + GPU + CPU for maximum performance per watt.**
 
-<!-- [![Crates.io](https://img.shields.io/crates/v/hmir.svg)](https://crates.io/crates/hmir) -->
 [![GitHub Release](https://img.shields.io/github/v/release/bhattkunalb/HMIR?label=release)](https://github.com/bhattkunalb/HMIR/releases)
 [![License](https://img.shields.io/github/license/bhattkunalb/HMIR)](LICENSE)
 [![CI](https://github.com/bhattkunalb/HMIR/actions/workflows/ci.yml/badge.svg)](https://github.com/bhattkunalb/HMIR/actions)
+<!-- [![Crates.io](https://img.shields.io/crates/v/hmir.svg)](https://crates.io/crates/hmir) --> <!-- Uncomment after first crates.io publish -->
 
 ---
 
@@ -15,8 +15,8 @@
 # Linux / macOS
 curl -fsSL https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.sh | sh
 
-# Windows (PowerShell)
-winget install hmir
+# Windows (PowerShell - Run as Administrator for NPU drivers)
+irm https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.ps1 | iex
 
 # Docker (No install required)
 docker run --gpus all -p 8080:8080 -p 3001:3001 ghcr.io/bhattkunalb/hmir:latest
@@ -29,7 +29,7 @@ docker run --gpus all -p 8080:8080 -p 3001:3001 ghcr.io/bhattkunalb/hmir:latest
 ## ⚙️ Initial Requirements
 
 | Component | Requirement |
-| --- | --- |
+|-----------|-------------|
 | **OS** | macOS 13+, Windows 10/11 22H2+, Ubuntu 20.04+ / Fedora 36+ |
 | **RAM** | 8GB minimum (16GB+ recommended for 7B models) |
 | **Storage** | 5GB for runtime + model cache |
@@ -37,7 +37,7 @@ docker run --gpus all -p 8080:8080 -p 3001:3001 ghcr.io/bhattkunalb/hmir:latest
 | **NPU Drivers** | Apple Neural Engine (built-in), Intel Core Ultra / Qualcomm Snapdragon (optional, auto-fallback) |
 
 🔍 **Do you need to install `llama.cpp` separately?**  
-**No.** HMIR bundles `llama.cpp` as a compiled, statically linked dependency. It is fetched and optimized during build or included in prebuilt binaries. Zero external setup required.
+**No.** HMIR bundles `llama.cpp` as a compiled, statically linked dependency via `hmir-sys`. It is fetched and optimized during build or included in prebuilt binaries. Zero external setup required.
 
 ---
 
@@ -68,16 +68,13 @@ RECOMMENDED MODELS:
 ## 🖥️ Dashboard & API Access
 
 ### Live TaskManager UI
-
 Launch with: `hmir start --dashboard`
-
 - Real-time CPU/GPU/NPU utilization bars
 - Active task registry with color-coded routing (🔵 GPU, 🟣 NPU, 🟠 CPU)
 - Speculative acceptance rate, swap throughput, memory pressure graphs
 - Controls: Pause/Resume/Kill, Strategy toggle, Hot-swap models, Force fallback
 
 ### OpenAI-Compatible API
-
 ```bash
 curl http://localhost:8080/v1/chat/completions \
   -H "Content-Type: application/json" \
@@ -96,7 +93,7 @@ Metrics: `http://localhost:8080/metrics` (Prometheus-compatible)
 ## 🔧 Troubleshooting
 
 | Issue | Fix |
-| --- | --- |
+|-------|-----|
 | NPU not detected | Check driver installation. HMIR safely blacklists missing NPUs and routes to GPU/CPU. Run `hmir logs --level debug` |
 | VRAM OOM during long context | HMIR auto-swaps KV cache to RAM. Reduce batch size: `hmir config set batch_max_tokens 2048` |
 | Dashboard blank on first run | Wait 2-3 seconds for telemetry stream. Verify port 3001 isn't blocked. Run `hmir status` |
@@ -109,7 +106,7 @@ Collect logs: `hmir logs --since 5m > hmir_debug.log`
 ## 🌐 Hardware Compatibility Matrix
 
 | Platform | NPU | GPU | CPU | Speculative Decoding | Notes |
-| --- | --- | --- | --- | --- | --- |
+|----------|-----|-----|-----|---------------------|-------|
 | Apple Silicon (M1/M2/M3) | ✅ ANE | ✅ Metal | ✅ ARM | ✅ Unified Memory optimized | Best tokens/watt |
 | Windows + Snapdragon X Elite | ✅ Qualcomm QNN | ❌ | ✅ ARM | ✅ NPU draft + CPU verify | Battery champion |
 | Linux + RTX 30/40 series | ❌ | ✅ CUDA | ✅ x86 | ⚠️ CPU draft + GPU verify | Max raw throughput |
@@ -123,3 +120,7 @@ See `CONTRIBUTING.md` for architecture guides, benchmark methodology, and plugin
 Releases follow semantic versioning. Prebuilt binaries include checksums. Auto-update: `hmir-cli update`
 
 **License**: MIT | **Built with**: Rust, llama.cpp, ONNX, egui, axum, tokio
+
+---
+
+> 💡 **First time?** Run `hmir suggest` to find the best model for your hardware, then `hmir load <path>` to start inferring.

@@ -1,15 +1,71 @@
-version: '3.8'
-services:
-  hmir-cpu:
-    image: ghcr.io/bhattkunalb/hmir:latest
-    profiles: ["cpu-fallback"]
-    ports: ["8080:8080"]
-    command: ["./hmir", "--force-cpu"]
+# deploy/docker-compose.yml
+# HMIR Docker Compose configuration
+# Usage: docker compose -f deploy/docker-compose.yml up
 
-  hmir-benchmark:
-    image: hmir/bench-harness:latest
-    profiles: ["benchmark"]
-    depends_on:
-      - hmir-cpu
+version: '3.8'
+
+services:
+  hmir-daemon:
+    image: ghcr.io/bhattkunalb/hmir:latest
+    container_name: hmir-daemon
+    restart: unless-stopped
+    ports:
+      - "8080:8080"  # OpenAI-compatible API
+      - "3001:3001"  # Dashboard UI
+      - "9090:9090"  # Prometheus metrics (optional)
+    volumes:
+      - hmir-models:/app/models
+      - hmir-cache:/app/.cache
+      - ./config:/app/config:ro  # Optional: mount custom config
     environment:
-      TARGET_ENDPOINT: "http://hmir-cpu:8080"
+      - HMIR_STRATEGY=auto  # latency|throughput|battery|auto
+      - HMIR_MAX_VRAM_GB=6  # Leave headroom for OS/display
+      - HMIR_ENABLE_NPU_DRAFT=true
+      - HMIR_LOG_LEVEL=info
+      # NVIDIA GPU support (if available)
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    # GPU runtime (uncomment if using NVIDIA)
+    # runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - hmir-net
+
+  # Optional: Open WebUI frontend
+  # Uncomment to enable chat interface
+  # open-webui:
+  #   image: ghcr.io/open-webui/open-webui:main
+  #   container_name: hmir-webui
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3000:8080"
+  #   environment:
+  #     - OPENAI_API_BASE_URL=http://hmir-daemon:8080
+  #     - OPENAI_API_KEY=hmir-local
+  #   depends_on:
+  #     hmir-daemon:
+  #       condition: service_healthy
+  #   networks:
+  #     - hmir-net
+
+volumes:
+  hmir-models:
+    driver: local
+  hmir-cache:
+    driver: local
+
+networks:
+  hmir-net:
+    driver: bridge

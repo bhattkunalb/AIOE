@@ -1,25 +1,70 @@
+# Cargo.toml (root workspace)
 [workspace]
+resolver = "2"
+members = [
+    "crates/hmir-core",
+    "crates/hmir-sys",
+    "crates/hmir-api",
+    "crates/hmir-cli",
+    "crates/hmir-dashboard",
+    "crates/hmir-bench",
+    "crates/hmir-e2e",
+    "crates/hmir-hardware-prober",
+]
+
 [workspace.package]
 version = "1.0.0"
+edition = "2021"
+rust-version = "1.75"
 license = "MIT"
+authors = ["Kunal Bhatt"]
+homepage = "https://github.com/bhattkunalb/HMIR"
 repository = "https://github.com/bhattkunalb/HMIR"
+documentation = "https://github.com/bhattkunalb/HMIR#readme"
+keywords = ["llm", "inference", "npu", "gpu", "local-ai"]
+categories = ["science::ai", "hardware-support"]
 
-members = [
-    "hmir-core",
-    "hmir-sys",
-    "hmir-pyo3",
-    "hmir-dashboard",
-    "hmir-hardware-prober",
-    "hmir-api",
-    "hmir-bench",
-    "deploy/packaging/hmir-cli",
-    "crates/hmir-e2e",
-    "deploy/packaging/hmir-cli"
-]
-resolver = "2"
+[workspace.dependencies]
+# Core async/runtime
+tokio = { version = "1.35", features = ["full", "tracing"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# HTTP/API
+axum = "0.7"
+reqwest = { version = "0.11", features = ["json", "stream"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Memory/FFI
+dashmap = "5.5"
+metrics = "0.22"
+mmap = "0.1"
+thiserror = "1.0"
+
+# UI
+egui = "0.26"
+eframe = "0.26"
+egui_plot = "0.26"
+
+# Backend FFI (bundled, no external install required)
+llama-cpp-sys = { path = "crates/hmir-sys/llama-cpp-sys" }
+onnxruntime-sys = { path = "crates/hmir-sys/onnxruntime-sys" }
 
 [profile.release]
-lto = "fat"
+lto = "thin"
 codegen-units = 1
-opt-level = 3
 panic = "abort"
+strip = true
+
+# Optional: Enable for crates.io publish
+# [workspace.metadata.publish]
+# enabled = false  # Set to true + run `cargo publish` when ready
+
+[features]
+default = ["dashboard", "openai-api", "hardware-prober"]
+dashboard = []
+openai-api = []
+hardware-prober = []
+publish = []  # Enable to allow crates.io publish in CI
+v1-1-preview = []  # Future performance features
