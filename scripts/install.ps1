@@ -259,47 +259,49 @@ function Test-NPUDrivers {
     
     $npuDetected = $false
     
-    # Method 1: Query PnP devices for NPU/AI accelerator hardware
+    # Method 1: Windows ComputeAccelerator device class (most reliable)
+    # Intel AI Boost and similar NPUs register under this class
     try {
-        $npuDevices = Get-PnpDevice -ErrorAction SilentlyContinue | Where-Object {
-            $_.FriendlyName -match '(?i)(NPU|Neural|AI Accelerator|Machine Learning|Movidius|VPU)' -or
-            $_.Class -match '(?i)(AIAccelerator|SoftwareComponent)' -and $_.FriendlyName -match '(?i)(NPU|Neural)'
-        }
-        if ($npuDevices) {
-            foreach ($dev in $npuDevices) {
+        $accelDevices = Get-PnpDevice -Class 'ComputeAccelerator' -ErrorAction SilentlyContinue
+        if ($accelDevices) {
+            foreach ($dev in $accelDevices) {
                 Write-Success "NPU detected: $($dev.FriendlyName) [Status: $($dev.Status)]"
                 $npuDetected = $true
             }
         }
     } catch {
-        # Get-PnpDevice not available on all editions
+        # Get-PnpDevice or class not available on all editions
     }
     
-    # Method 2: Query WMI for Intel NPU (common on Core Ultra)
-    try {
-        $intelNpu = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
-            $_.Name -match '(?i)(Intel.*NPU|Intel.*AI Boost|Intel.*Neural|Meteor Lake.*NPU|Arrow Lake.*NPU|Lunar Lake.*NPU)'
-        }
-        if ($intelNpu -and -not $npuDetected) {
-            foreach ($dev in $intelNpu) {
-                Write-Success "Intel NPU detected: $($dev.Name)"
-                $npuDetected = $true
+    # Method 2: WMI fallback for Intel NPU (Core Ultra / Meteor Lake / Arrow Lake)
+    if (-not $npuDetected) {
+        try {
+            $intelNpu = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
+                $_.Name -match '(?i)(Intel.*NPU|Intel.*AI Boost|Intel.*Neural)'
             }
-        }
-    } catch {}
+            if ($intelNpu) {
+                foreach ($dev in $intelNpu) {
+                    Write-Success "Intel NPU detected: $($dev.Name)"
+                    $npuDetected = $true
+                }
+            }
+        } catch {}
+    }
     
-    # Method 3: Check for Qualcomm NPU (Snapdragon X Elite/Plus)
-    try {
-        $qcomNpu = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
-            $_.Name -match '(?i)(Qualcomm.*NPU|Qualcomm.*AI|Hexagon|QC.*NPU)'
-        }
-        if ($qcomNpu -and -not $npuDetected) {
-            foreach ($dev in $qcomNpu) {
-                Write-Success "Qualcomm NPU detected: $($dev.Name)"
-                $npuDetected = $true
+    # Method 3: WMI fallback for Qualcomm NPU (Snapdragon X Elite/Plus)
+    if (-not $npuDetected) {
+        try {
+            $qcomNpu = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
+                $_.Name -match '(?i)(Qualcomm.*NPU|Qualcomm.*AI Engine|Hexagon)'
             }
-        }
-    } catch {}
+            if ($qcomNpu) {
+                foreach ($dev in $qcomNpu) {
+                    Write-Success "Qualcomm NPU detected: $($dev.Name)"
+                    $npuDetected = $true
+                }
+            }
+        } catch {}
+    }
     
     # Method 4: Check for known runtime SDKs
     if (-not $npuDetected) {
@@ -313,22 +315,11 @@ function Test-NPUDrivers {
         }
     }
     
-    # DirectML availability (works as GPU/NPU abstraction layer)
-    try {
-        $directml = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
-            $_.Name -match '(?i)(DirectML|DirectX.*Machine Learning)'
-        }
-        if (-not $directml) {
-            Write-Info "DirectML available as fallback compute backend"
-        }
-    } catch {}
-    
     if (-not $npuDetected) {
         Write-Warn "No dedicated NPU hardware detected. HMIR will auto-fallback to GPU/CPU."
         Write-Warn "If you have an NPU, ensure drivers are installed:"
         Write-Warn "  Intel Core Ultra: Install Intel NPU Driver from intel.com"
         Write-Warn "  Snapdragon X: Install Qualcomm AI Engine Direct drivers"
-        Write-Warn "  (Run 'Get-PnpDevice | Where FriendlyName -match NPU' to check)"
     }
 }
 

@@ -8,9 +8,11 @@ members = [
     "hmir-dashboard",
     "hmir-hardware-prober",
     "hmir-bench",
-    "hmir-pyo3",
     "crates/hmir-e2e",
     "deploy/packaging/hmir-cli",
+]
+exclude = [
+    "hmir-pyo3",  # Requires pyo3 0.22+ for Python 3.13+; excluded until upgraded
 ]
 
 [workspace.package]
