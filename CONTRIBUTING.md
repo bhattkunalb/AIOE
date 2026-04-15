@@ -8,29 +8,29 @@ Thank you for your interest in contributing to **HMIR: Heterogeneous Memory-Firs
 
 ```text
 HMIR Workspace (Rust 2021)
+├── hmir-core/              # Core orchestration: scheduler, memory, topology
+├── hmir-sys/               # FFI bindings: llama.cpp, ONNX Runtime (bundled)
+├── hmir-api/               # OpenAI-compatible Axum server + Prometheus metrics
+├── hmir-dashboard/         # Native egui TaskManager UI (60 FPS telemetry)
+├── hmir-hardware-prober/   # Cross-platform hardware detection (cfg-gated)
+├── hmir-bench/             # Benchmark harness: TTFT, ITL, tokens/watt
+├── hmir-pyo3/              # Python bindings (excluded; needs pyo3 upgrade)
+│
 ├── crates/
-│   ├── hmir-core/          # Core orchestration: scheduler, memory, topology
-│   ├── hmir-sys/           # FFI bindings: llama.cpp, ONNX Runtime (bundled)
-│   ├── hmir-api/           # OpenAI-compatible Axum server + Prometheus metrics
-│   ├── hmir-cli/           # CLI interface: suggest, start, logs, update
-│   ├── hmir-dashboard/     # Native egui TaskManager UI (60 FPS telemetry)
-│   ├── hmir-hardware-prober/ # Cross-platform hardware detection (cfg-gated)
-│   ├── hmir-bench/         # Benchmark harness: TTFT, ITL, tokens/watt
 │   └── hmir-e2e/           # End-to-end validation: daemon lifecycle + UI smoke
 │
 ├── deploy/
+│   ├── packaging/hmir-cli/ # CLI binary: suggest, start, logs, update
 │   ├── docker-compose.yml  # Multi-service setup (daemon + optional WebUI)
-│   ├── Dockerfile          # Multi-stage build with GPU/NPU profiles
-│   └── packaging/          # .deb, .pkg, .msi specs for native installers
+│   └── Dockerfile.multi    # Multi-stage build with GPU/NPU profiles
 │
 ├── scripts/
-│   ├── install.sh          # Linux/macOS one-click installer
-│   ├── install.ps1         # Windows PowerShell installer
-│   └── migrate-repo-name.sh # Safe global find/replace for repo migrations
+│   ├── install.sh          # Linux/macOS installer (release download + source fallback)
+│   └── install.ps1         # Windows installer (WMI/PnP NPU detection)
 │
 └── examples/
     ├── langchain_hmir.py   # LangChain custom LLM integration
-    ├── openwebui-docker.yml # Docker Compose for Open WebUI + HMIR
+    ├── openwebui_docker.yml # Docker Compose for Open WebUI + HMIR
     └── llamaindex_rag.rs   # Rust LlamaIndex example with HMIR API
 ```
 
@@ -61,27 +61,35 @@ HMIR Workspace (Rust 2021)
 git clone https://github.com/bhattkunalb/HMIR.git
 cd HMIR
 
-# Build debug version (fast iteration)
+# Build all workspace crates (debug)
 cargo build --workspace
 
-# Build release version (optimized)
-cargo build --release --workspace --features dashboard,openai-api,hardware-prober
+# Build all workspace crates (release, optimized)
+cargo build --release --workspace
 
-# Run with dashboard
-cargo run --release --bin hmir-cli -- start --dashboard
+# Run the CLI with dashboard
+cargo run --release -p hmir-cli -- start --dashboard
+
+# Build only a specific crate
+cargo build -p hmir-core
+cargo build -p hmir-api
 ```
+
+> **Note:** `hmir-pyo3` is excluded from the workspace by default because pyo3 v0.20.3
+> does not support Python 3.13+. Build it separately with `cargo build -p hmir-pyo3` if
+> you have Python ≤ 3.12 installed.
 
 ### Feature Flags
 
-```bash
-# Minimal build (core only)
-cargo build --workspace --no-default-features
+Feature flags are defined in each crate's own `Cargo.toml`, not at the workspace root.
+Enable them per-crate:
 
-# Enable specific features
-cargo build --features dashboard          # Native egui UI
-cargo build --features openai-api         # Axum server + /v1 endpoints
-cargo build --features lora-adapters      # Dynamic LoRA loading
-cargo build --features v1-1-preview       # Future performance features (adaptive draft, dynamic quant)
+```bash
+# Build the API server with specific features
+cargo build -p hmir-api --features openai-compat
+
+# Build the dashboard with plot widgets
+cargo build -p hmir-dashboard --features live-plots
 ```
 
 ### IDE Setup
@@ -90,7 +98,6 @@ cargo build --features v1-1-preview       # Future performance features (adaptiv
 
   ```json
   {
-    "rust-analyzer.cargo.features": ["dashboard", "openai-api", "hardware-prober"],
     "rust-analyzer.checkOnSave.command": "clippy"
   }
   ```
@@ -181,7 +188,7 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
 
 ### Adding a New Backend Adapter
 
-1. Create `crates/hmir-sys/src/backends/new_backend_adapter.rs`
+1. Create `hmir-sys/src/backends/new_backend_adapter.rs`
 2. Implement `PagedBackendAdapter` trait:
 
    ```rust
@@ -207,8 +214,8 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
 
 ### Adding a New CLI Command
 
-1. Create `crates/hmir-cli/src/commands/new_command.rs`
-2. Register in `crates/hmir-cli/src/main.rs`:
+1. Create `deploy/packaging/hmir-cli/src/commands/new_command.rs`
+2. Register in `deploy/packaging/hmir-cli/src/main.rs`:
 
    ```rust
    #[derive(Subcommand)]
@@ -221,11 +228,11 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
 
 3. Implement logic using existing `hmir-core` APIs
 4. Add `--help` documentation and examples
-5. Write integration test in `crates/hmir-e2e/tests/cli_new_command.rs`
+5. Write integration test in `crates/hmir-e2e/tests/cli_new_command.rs` (E2E stays under `crates/`)
 
 ### Adding Dashboard Widget
 
-1. Create `crates/hmir-dashboard/src/widgets/new_widget.rs`
+1. Create `hmir-dashboard/src/widgets/new_widget.rs`
 2. Use `egui` immediate mode:
 
    ```rust
@@ -246,7 +253,7 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
 
 When adding performance-sensitive code:
 
-1. **Add benchmark case** in `crates/hmir-bench/src/scenarios/`:
+1. **Add benchmark case** in `hmir-bench/src/scenarios/`:
 
    ```rust
    pub fn new_scenario() -> Scenario {
@@ -311,7 +318,7 @@ When adding performance-sensitive code:
 
 HMIR supports heterogeneous routing via `HardwareCompatibilityMatrix`. To add new hardware:
 
-1. **Add OS-specific probe** in `crates/hmir-hardware-prober/src/`:
+1. **Add OS-specific probe** in `hmir-hardware-prober/src/`:
 
    ```rust
    #[cfg(target_os = "your-os")]
