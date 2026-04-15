@@ -2,14 +2,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "crates/hmir-core",
-    "crates/hmir-sys",
-    "crates/hmir-api",
-    "crates/hmir-cli",
-    "crates/hmir-dashboard",
-    "crates/hmir-bench",
+    "hmir-core",
+    "hmir-sys",
+    "hmir-api",
+    "hmir-dashboard",
+    "hmir-hardware-prober",
+    "hmir-bench",
+    "hmir-pyo3",
     "crates/hmir-e2e",
-    "crates/hmir-hardware-prober",
+    "deploy/packaging/hmir-cli",
 ]
 
 [workspace.package]
@@ -48,8 +49,9 @@ eframe = "0.26"
 egui_plot = "0.26"
 
 # Backend FFI (bundled, no external install required)
-llama-cpp-sys = { path = "crates/hmir-sys/llama-cpp-sys" }
-onnxruntime-sys = { path = "crates/hmir-sys/onnxruntime-sys" }
+# Uncomment once the bundled sys crates are generated:
+# llama-cpp-sys = { path = "hmir-sys/llama-cpp-sys" }
+# onnxruntime-sys = { path = "hmir-sys/onnxruntime-sys" }
 
 [profile.release]
 lto = "thin"
