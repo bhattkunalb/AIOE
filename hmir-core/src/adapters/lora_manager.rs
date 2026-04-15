@@ -21,14 +21,14 @@ pub struct AdapterState {
 
 pub struct LoRAAdapterManager {
     pub loaded_adapters: DashMap<String, AdapterState>,
-    telemetry: Arc<TelemetrySink>,
+    _telemetry: Arc<TelemetrySink>,
 }
 
 impl LoRAAdapterManager {
     pub fn new(telemetry: Arc<TelemetrySink>) -> Self {
         Self {
             loaded_adapters: DashMap::new(),
-            telemetry,
+            _telemetry: telemetry,
         }
     }
 

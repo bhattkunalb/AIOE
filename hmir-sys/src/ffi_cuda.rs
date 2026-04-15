@@ -3,6 +3,9 @@
 //! When HMIR determines a KV block must be evicted, we don't rely on OS level paging or
 //! NVIDIA's opaque UVM. We explicitly execute DMA transfer buffers.
 
+#![allow(dead_code, unused_variables)]
+
+
 use core::ffi::{c_void, c_int, c_ulonglong};
 
 /// NVIDIA Error Code return value layout 

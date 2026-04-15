@@ -17,7 +17,7 @@ pub struct ExecutionProfile {
 
 pub struct HardwareCompatibilityMatrix {
     active_profile: Arc<RwLock<ExecutionProfile>>,
-    telemetry: Arc<TelemetrySink>,
+    _telemetry: Arc<TelemetrySink>,
 }
 
 impl HardwareCompatibilityMatrix {
@@ -27,7 +27,7 @@ impl HardwareCompatibilityMatrix {
                 active_device: "CPU".to_string(),
                 profile_tier: "fallback".to_string(),
             })),
-            telemetry,
+            _telemetry: telemetry,
         }
     }
 
@@ -56,7 +56,7 @@ impl HardwareCompatibilityMatrix {
         Ok(profile.clone())
     }
 
-    fn emit_routing_decision(&self, decision: &ExecutionProfile) {
+    fn emit_routing_decision(&self, _decision: &ExecutionProfile) {
         // Broadcast bound
     }
 }
