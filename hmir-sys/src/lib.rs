@@ -4,6 +4,8 @@
 
 pub mod ffi_llama;
 pub mod ffi_cuda;
+pub mod ffi_onnx;
+pub mod backends;
 
 // Standard testing for verifying ABI memory alignments.
 #[cfg(test)]
