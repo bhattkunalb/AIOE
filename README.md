@@ -2,10 +2,10 @@
 
 **Run local LLMs that automatically orchestrate NPU + GPU + CPU for maximum performance per watt.**
 
-[![Crates.io](https://img.shields.io/crates/v/hmir.svg)](https://crates.io/crates/hmir)
-[![GitHub Release](https://img.shields.io/github/v/release/bhattkunalb/AIOE)](https://github.com/bhattkunalb/AIOE/releases)
-[![License](https://img.shields.io/github/license/bhattkunalb/AIOE)](LICENSE)
-[![CI](https://github.com/bhattkunalb/AIOE/actions/workflows/ci.yml/badge.svg)](https://github.com/bhattkunalb/AIOE/actions)
+<!-- [![Crates.io](https://img.shields.io/crates/v/hmir.svg)](https://crates.io/crates/hmir) -->
+[![GitHub Release](https://img.shields.io/github/v/release/bhattkunalb/HMIR?label=release)](https://github.com/bhattkunalb/HMIR/releases)
+[![License](https://img.shields.io/github/license/bhattkunalb/HMIR)](LICENSE)
+[![CI](https://github.com/bhattkunalb/HMIR/actions/workflows/ci.yml/badge.svg)](https://github.com/bhattkunalb/HMIR/actions)
 
 ---
 
@@ -13,7 +13,7 @@
 
 ```bash
 # Linux / macOS
-curl -fsSL https://raw.githubusercontent.com/bhattkunalb/AIOE/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.sh | sh
 
 # Windows (PowerShell)
 winget install hmir

@@ -3,6 +3,10 @@ set -e
 
 echo "Fetching Native execution bindings spanning arrays explicitly..."
 
+REPO="bhattkunalb/HMIR"
+RELEASE_ENDPOINT="https://api.github.com/repos/${REPO}/releases/latest"
+
+
 # Determine OS
 OS="$(uname -s)"
 ARCH="$(uname -m)"

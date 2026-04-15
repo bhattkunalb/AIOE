@@ -23,6 +23,14 @@
         "onnx",
         "ONNX",
         "egui",
-        "TFLOP"
+        "TFLOP",
+        "codegen",
+        "eframe",
+        "mmap",
+        "pyclass",
+        "pymethods",
+        "pymodule",
+        "reqwest",
+        "seqs"
     ]
 }

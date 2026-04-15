@@ -1,10 +1,16 @@
-name: CI
+name: HMIR CI
 
 on:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  release:
+    types: [ published ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
 
 jobs:
   build:
@@ -30,3 +36,24 @@ jobs:
 
     - name: Run E2E Bench
       run: cargo test -p hmir-e2e --verbose
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: hmir-${{ matrix.os }}
+        path: target/debug/hmir*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.repository == 'bhattkunalb/HMIR' && github.event_name == 'release' && github.event.action == 'published'
+    steps:
+      - uses: actions/checkout@v3
+      
+      # Optional: Publish to crates.io
+      - name: Cargo Publish
+        run: cargo publish --features publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        # Disabled by default, wait until crates are ready
+        continue-on-error: true
