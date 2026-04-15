@@ -35,6 +35,7 @@ HMIR Workspace (Rust 2021)
 ```
 
 **Key Design Principles**:
+
 - **Memory-first**: KV cache is paged, non-contiguous, and swap-aware. Never copy unless necessary.
 - **Zero-hot-path blocking**: Telemetry, logging, and UI updates use async channels. Inference kernels never wait.
 - **Graceful degradation**: If NPU driver missing → fallback to GPU → CPU. Never panic on hardware probe failure.
@@ -45,8 +46,9 @@ HMIR Workspace (Rust 2021)
 ## 🛠️ Development Setup
 
 ### Prerequisites
+
 | Component | Version | Install Command |
-|-----------|---------|----------------|
+| --------- | ------- | --------------- |
 | Rust toolchain | 1.75+ | `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \| sh` |
 | CMake | 3.20+ | `winget install Kitware.CMake` (Win) / `brew install cmake` (macOS) / `apt install cmake` (Linux) |
 | Git | 2.30+ | Package manager of your OS |
@@ -54,6 +56,7 @@ HMIR Workspace (Rust 2021)
 | (Optional) Metal | macOS 13+ | Built-in via Xcode Command Line Tools |
 
 ### Clone & Build
+
 ```bash
 git clone https://github.com/bhattkunalb/HMIR.git
 cd HMIR
@@ -69,6 +72,7 @@ cargo run --release --bin hmir-cli -- start --dashboard
 ```
 
 ### Feature Flags
+
 ```bash
 # Minimal build (core only)
 cargo build --workspace --no-default-features
@@ -81,13 +85,16 @@ cargo build --features v1-1-preview       # Future performance features (adaptiv
 ```
 
 ### IDE Setup
+
 - **VS Code**: Install `rust-analyzer` extension. Add `.vscode/settings.json`:
+
   ```json
   {
     "rust-analyzer.cargo.features": ["dashboard", "openai-api", "hardware-prober"],
     "rust-analyzer.checkOnSave.command": "clippy"
   }
   ```
+
 - **IntelliJ Rust**: Enable "Fetch external documentation" and "Run cargo check on the fly".
 
 ---
@@ -97,26 +104,31 @@ cargo build --features v1-1-preview       # Future performance features (adaptiv
 HMIR uses a multi-layered testing strategy. All PRs must pass:
 
 ### 1. Unit Tests (`cargo test --lib`)
+
 - Test individual components in isolation
 - Use `#[cfg(test)]` modules with `assert_eq!`, `proptest` for property-based testing
 - Example: `paged_gather_preserves_logical_order` validates block table correctness
 
 ### 2. Integration Tests (`cargo test --test '*'`)
+
 - Test component interactions (e.g., `DraftVerifier` + `SwapManager`)
 - Use `tokio::test` for async tests
 - Mock FFI calls with `mockall` or stubbed C functions
 
 ### 3. End-to-End Tests (`cargo test -p hmir-e2e`)
+
 - Launch daemon, send API requests, verify telemetry + UI updates
 - Run headless in CI, support `--gui` flag for local visual smoke tests
 - Output JUnit + HTML reports for release validation
 
 ### 4. Benchmark Tests (`cargo bench -p hmir-bench`)
+
 - Measure TTFT, ITL, tokens/sec, VRAM usage, power draw
 - Compare against baseline; fail CI if regression >10%
 - Output JSON for Grafana/Prometheus ingestion
 
 ### Running Tests
+
 ```bash
 # Quick test suite (unit + integration)
 cargo test --workspace --lib --bins
@@ -136,6 +148,7 @@ cargo bench -p hmir-bench -- --baseline main
 ## 🎨 Code Style & Quality Gates
 
 ### Formatting & Linting
+
 ```bash
 # Auto-format all code
 cargo fmt --all
@@ -150,12 +163,14 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
 ```
 
 ### Documentation Standards
+
 - All `pub` functions must have `///` doc comments with `# Example` where applicable
 - Use `tracing::instrument` for async functions to auto-log entry/exit
 - Return `Result<T, CustomError>` with `thiserror`-derived variants
 - Add `// SAFETY:` comments for every `unsafe` block
 
 ### Telemetry & Observability
+
 - Emit metrics via `metrics::histogram!`, `counter!`, `gauge!`
 - Log structured events with `tracing::info!`, `debug!`, `error!`
 - Never block inference hot path: use `tokio::sync::broadcast` for telemetry
@@ -165,8 +180,10 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
 ## 🚀 Adding New Features
 
 ### Adding a New Backend Adapter
+
 1. Create `crates/hmir-sys/src/backends/new_backend_adapter.rs`
 2. Implement `PagedBackendAdapter` trait:
+
    ```rust
    impl PagedBackendAdapter for NewBackendAdapter {
        fn register_kv_block(...) -> Result<...> { /* zero-copy mapping */ }
@@ -174,7 +191,9 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
        fn release_block(...) -> Result<()> { /* update ref counts */ }
    }
    ```
+
 3. Add conditional compilation in `hmir-sys/Cargo.toml`:
+
    ```toml
    [features]
    new-backend = ["dep:new-backend-sys"]
@@ -182,12 +201,15 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
    [dependencies]
    new-backend-sys = { version = "x.y", optional = true }
    ```
+
 4. Update `HardwareCompatibilityMatrix` to probe for new backend
 5. Add tests: correctness, performance, fallback behavior
 
 ### Adding a New CLI Command
+
 1. Create `crates/hmir-cli/src/commands/new_command.rs`
 2. Register in `crates/hmir-cli/src/main.rs`:
+
    ```rust
    #[derive(Subcommand)]
    enum Commands {
@@ -196,13 +218,16 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
        NewCommand(new_command::Args),
    }
    ```
+
 3. Implement logic using existing `hmir-core` APIs
 4. Add `--help` documentation and examples
 5. Write integration test in `crates/hmir-e2e/tests/cli_new_command.rs`
 
 ### Adding Dashboard Widget
+
 1. Create `crates/hmir-dashboard/src/widgets/new_widget.rs`
 2. Use `egui` immediate mode:
+
    ```rust
    pub fn show(ui: &mut egui::Ui, telemetry: &TelemetryStream) -> egui::Response {
        ui.horizontal(|ui| {
@@ -211,6 +236,7 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
        })
    }
    ```
+
 3. Subscribe to `TelemetrySink` via async channel
 4. Ensure 60 FPS: use `ui.ctx().request_repaint()` sparingly, batch updates
 
@@ -221,6 +247,7 @@ cargo clippy --workspace --all-targets -- -D warnings || exit 1
 When adding performance-sensitive code:
 
 1. **Add benchmark case** in `crates/hmir-bench/src/scenarios/`:
+
    ```rust
    pub fn new_scenario() -> Scenario {
        Scenario {
@@ -235,6 +262,7 @@ When adding performance-sensitive code:
    ```
 
 2. **Run baseline comparison**:
+
    ```bash
    cargo bench -p hmir-bench -- --save-baseline before-change
    # Apply your changes
@@ -242,6 +270,7 @@ When adding performance-sensitive code:
    ```
 
 3. **Report results** in PR description:
+
    ```markdown
    ## Benchmark Results
    | Metric | Before | After | Delta |
@@ -268,6 +297,7 @@ When adding performance-sensitive code:
 8. **Merge**: Maintainer merges to `main`; auto-tag if version bump detected
 
 ### PR Checklist
+
 - [ ] All tests pass (`cargo test --workspace`)
 - [ ] Benchmarks show no regression >10% (or justify if intentional)
 - [ ] Code formatted (`cargo fmt`) and clippy-clean
@@ -282,6 +312,7 @@ When adding performance-sensitive code:
 HMIR supports heterogeneous routing via `HardwareCompatibilityMatrix`. To add new hardware:
 
 1. **Add OS-specific probe** in `crates/hmir-hardware-prober/src/`:
+
    ```rust
    #[cfg(target_os = "your-os")]
    mod your_os;
@@ -294,6 +325,7 @@ HMIR supports heterogeneous routing via `HardwareCompatibilityMatrix`. To add ne
    ```
 
 2. **Update `NpuVendor` enum** in `hmir-core/src/platform/mod.rs`:
+
    ```rust
    pub enum NpuVendor {
        // ... existing
@@ -302,6 +334,7 @@ HMIR supports heterogeneous routing via `HardwareCompatibilityMatrix`. To add ne
    ```
 
 3. **Add routing logic** in `HardwareAwareDraftSelector`:
+
    ```rust
    impl HardwareAwareDraftSelector {
        fn should_use_npu(&self, vendor: NpuVendor) -> bool {
@@ -314,6 +347,7 @@ HMIR supports heterogeneous routing via `HardwareCompatibilityMatrix`. To add ne
    ```
 
 4. **Document in `docs/hardware_compatibility.md`**:
+
    ```markdown
    ### Your Vendor NPU
    - Driver: [Link to driver download]
@@ -323,6 +357,7 @@ HMIR supports heterogeneous routing via `HardwareCompatibilityMatrix`. To add ne
    ```
 
 5. **Add CI test matrix entry** (if hardware available in CI):
+
    ```yaml
    # .github/workflows/ci.yml
    strategy:
@@ -339,6 +374,7 @@ HMIR supports heterogeneous routing via `HardwareCompatibilityMatrix`. To add ne
 HMIR follows semantic versioning (`MAJOR.MINOR.PATCH`).
 
 ### Pre-Release Checklist
+
 - [ ] All CI checks green on `main`
 - [ ] `cargo test --workspace --all-features` passes
 - [ ] Benchmarks show no regression vs. previous release
@@ -347,6 +383,7 @@ HMIR follows semantic versioning (`MAJOR.MINOR.PATCH`).
 - [ ] Version bumped in root `Cargo.toml` and all crates
 
 ### Tag & Publish
+
 ```bash
 # Tag release
 git tag -a v1.1.0 -m "HMIR v1.1.0: Adaptive speculative depth + dynamic quant selector"
@@ -364,6 +401,7 @@ git push origin v1.1.0
 ```
 
 ### Post-Release
+
 - Update `crates.io` badge in `README.md` (uncomment if first publish)
 - Announce on community channels (Discord, Matrix, Reddit)
 - Monitor issues for 48 hours for regression reports
@@ -375,7 +413,7 @@ git push origin v1.1.0
 - **Bug reports**: Use GitHub Issues with `bug` label + `hmir logs --level debug` output
 - **Feature requests**: Use GitHub Issues with `enhancement` label + use case description
 - **Questions**: Start a GitHub Discussion or join our community chat
-- **Security issues**: Email security@hmirlabs.dev (do not publicize until patched)
+- **Security issues**: Email <security@hmirlabs.dev> (do not publicize until patched)
 
 ---
 

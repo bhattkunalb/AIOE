@@ -272,7 +272,7 @@ function Test-NPUDrivers {
 # ========================================
 # Post-Install Verification
 # ========================================
-function Verify-Installation {
+function Test-Installation {
     Write-Info "Verifying installation..."
     
     # Refresh PATH in current session
@@ -319,7 +319,7 @@ function Main {
     Install-Binaries -PlatformInfo $platform
     Update-UserPath
     Test-NPUDrivers
-    Verify-Installation
+    Test-Installation
     
     Write-Host ""
     Write-Success "🎉 Installation complete!"
