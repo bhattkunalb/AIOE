@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "hmir-core"
+    "hmir-core",
+    "hmir-sys"
 ]
 resolver = "2"
 

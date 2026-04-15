@@ -1,0 +1,15 @@
+[package]
+name = "hmir-sys"
+version = "0.1.0"
+edition = "2021"
+description = "Unsafe C-FFI bindings linking HMIR to inference backends"
+
+[dependencies]
+libc = "0.2"
+
+[build-dependencies]
+cc = "1.0"
+# bindgen = "0.68" # Retained setup for dynamic wrapper generation later
+
+[dev-dependencies]
+# We'll use core tests for memory layout checking
