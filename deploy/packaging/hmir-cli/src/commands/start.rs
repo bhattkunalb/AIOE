@@ -35,7 +35,27 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
     }
     
     match api_cmd.spawn() {
-        Ok(_) => println!("✅ [OK]"),
+        Ok(_) => {
+            // Health check loop
+            let client = reqwest::Client::new();
+            let mut success = false;
+            for _i in 1..=10 {
+                tokio::time::sleep(Duration::from_millis(1000)).await;
+                if let Ok(res) = client.get(format!("http://127.0.0.1:{}/v1/health", port)).send().await {
+                    if res.status().is_success() {
+                        success = true;
+                        break;
+                    }
+                }
+                print!("."); 
+                let _ = std::io::Write::flush(&mut std::io::stdout());
+            }
+            if success {
+                println!("✅ [OK]");
+            } else {
+                println!("⚠️ [WARN] API started but health-check timed out. Check logs.");
+            }
+        },
         Err(e) => {
             println!("❌ [ERROR] Failed to start API: {}", e);
             return;

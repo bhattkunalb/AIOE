@@ -2108,6 +2108,7 @@ version = "0.1.0"
 dependencies = [
  "hmir-core",
  "serde",
+ "serde_json",
  "sysinfo",
  "tokio",
  "wmi",

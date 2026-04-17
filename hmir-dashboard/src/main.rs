@@ -37,6 +37,9 @@ pub struct DashboardApp {
     live_ram_total: f64,
     live_vram: f64,
     live_vram_total: f64,
+    live_vram_dedicated: f64,
+    live_vram_shared: f64,
+    live_npu_vram: f64,
     live_tps: f64,
     live_npu: f64,
     live_uptime: u64,
@@ -94,16 +97,19 @@ impl DashboardApp {
             current_tab: Tab::CommandCenter,
             mini_mode: false,
             live_temp: 0.0,
-            live_ram: 0.0,
-            live_ram_total: 0.1,
             live_vram: 0.0,
+            live_vram_total: 0.1,
+            live_vram_dedicated: 0.0,
+            live_vram_shared: 0.0,
+            live_npu_vram: 0.0,
             live_tps: 0.0,
             live_npu: 0.0,
             live_uptime: 0,
             live_kv: 0.0,
-            live_disk_free: 0.0,
+            live_ram: 0.0,
+            live_ram_total: 0.1,
             live_gpu_temp: 0.0,
-            live_vram_total: 0.1,
+            live_disk_free: 0.0,
             cpu_name: "Detecting...".into(),
             gpu_name: "Detecting...".into(),
             npu_name: "Detecting...".into(),
@@ -158,8 +164,9 @@ impl eframe::App for DashboardApp {
         while let Ok(event) = self.telemetry_receiver.try_recv() {
             match event {
                 TelemetryEvent::HardwareState { 
-                    cpu_temp, gpu_temp, ram_used, tps, npu_util, vram_used, vram_total, node_uptime, kv_cache, 
-                    cpu_name, gpu_name, npu_name, ram_total, disk_free, .. 
+                    cpu_temp, gpu_temp, ram_used, tps, npu_util, vram_used, vram_total, 
+                    gpu_vram_dedicated, gpu_vram_shared, npu_vram_used,
+                    node_uptime, kv_cache, cpu_name, gpu_name, npu_name, ram_total, disk_free, .. 
                 } => {
                     self.live_temp = cpu_temp;
                     self.live_gpu_temp = gpu_temp;
@@ -167,6 +174,9 @@ impl eframe::App for DashboardApp {
                     self.live_ram_total = ram_total;
                     self.live_vram = vram_used;
                     self.live_vram_total = vram_total;
+                    self.live_vram_dedicated = gpu_vram_dedicated;
+                    self.live_vram_shared = gpu_vram_shared;
+                    self.live_npu_vram = npu_vram_used;
                     self.live_tps = tps;
                     self.live_npu = npu_util;
                     self.live_uptime = node_uptime;
@@ -250,82 +260,98 @@ impl eframe::App for DashboardApp {
         egui::CentralPanel::default().frame(egui::Frame::none().fill(egui::Color32::from_rgb(8, 8, 10)).inner_margin(20.0)).show(ctx, |ui| {
             match self.current_tab {
                 Tab::CommandCenter => {
-                    // High-Fidelity Hardware Panel
-                    egui::Frame::none()
-                        .fill(egui::Color32::from_rgb(15, 15, 18))
-                        .rounding(8.0)
-                        .inner_margin(15.0)
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(30, 30, 35)))
-                        .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new("CPU").size(10.0).color(egui::Color32::GRAY));
-                                    ui.label(egui::RichText::new(&self.cpu_name).strong().color(egui::Color32::WHITE));
-                                });
-                                ui.add_space(30.0);
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new("GPU").size(10.0).color(egui::Color32::GRAY));
-                                    ui.label(egui::RichText::new(&self.gpu_name).strong().color(egui::Color32::WHITE));
-                                });
-                                ui.add_space(30.0);
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new("NPU").size(10.0).color(egui::Color32::GRAY));
-                                    ui.label(egui::RichText::new(&self.npu_name).strong().color(egui::Color32::from_rgb(0, 255, 150)));
-                                });
-                                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                    ui.vertical(|ui| {
-                                        ui.label(egui::RichText::new("DISK FREE").size(10.0).color(egui::Color32::GRAY));
-                                        ui.label(egui::RichText::new(format!("{:.1} GB", self.live_disk_free)).strong().color(egui::Color32::WHITE));
-                                    });
-                                });
-                            });
-                        });
-
-                    ui.add_space(20.0);
-                    
-                    // Hardware Metrics Row
+                    // SECTION 1: TOP-LEVEL SLICING
                     ui.horizontal(|ui| {
                         Self::draw_metric_card(ui, "THROUGHPUT", &format!("{:.1} T/s", self.live_tps), egui::Color32::from_rgb(0, 240, 255));
                         ui.add_space(10.0);
                         Self::draw_metric_card(ui, "AI BOOST", &format!("{:.0}%", self.live_npu), egui::Color32::from_rgb(0, 255, 150));
                         ui.add_space(10.0);
-                        
-                        let ram_pct = (self.live_ram / self.live_ram_total.max(0.1)) as f32;
-                        let vram_pct = (self.live_vram / self.live_vram_total.max(0.1)) as f32;
+                        Self::draw_metric_card(ui, "THERMALS", &format!("{:.1}°C", self.live_temp), if self.live_temp > 85.0 { egui::Color32::RED } else { egui::Color32::from_gray(200) });
+                        ui.add_space(10.0);
+                        Self::draw_metric_card(ui, "KV CACHE", &format!("{:.1}%", self.live_kv), egui::Color32::from_rgb(200, 150, 0));
+                    });
 
-                        egui::Frame::none()
-                            .fill(egui::Color32::from_rgb(20, 20, 24))
-                            .rounding(8.0)
-                            .inner_margin(12.0)
-                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(35, 35, 40)))
-                            .show(ui, |ui| {
-                                ui.set_min_width(180.0);
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new("SYSTEM RAM").size(11.0).color(egui::Color32::from_gray(140)).strong());
-                                    ui.add_space(4.0);
-                                    ui.label(egui::RichText::new(format!("{:.1} / {:.0} GB", self.live_ram, self.live_ram_total)).size(18.0).strong().color(egui::Color32::WHITE));
-                                    ui.add_space(8.0);
-                                    ui.add_sized([ui.available_width(), 4.0], egui::ProgressBar::new(ram_pct).fill(egui::Color32::from_rgb(255, 100, 0)));
+                    ui.add_space(20.0);
+                    ui.label(egui::RichText::new("SILICON HEALTH TILES (GiB)").size(14.0).color(egui::Color32::from_gray(160)).strong());
+                    ui.add_space(10.0);
+
+                    // SECTION 2: SILICON HEALTH TILES
+                    ui.horizontal(|ui| {
+                        // CPU TILE
+                        egui::Frame::none().fill(egui::Color32::from_rgb(18, 18, 22)).rounding(8.0).inner_margin(12.0).stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(35, 35, 40))).show(ui, |ui| {
+                            ui.set_min_width(260.0);
+                            ui.vertical(|ui| {
+                                ui.label(egui::RichText::new("CENTRAL PROCESSOR").size(11.0).color(egui::Color32::from_gray(120)).strong());
+                                ui.label(egui::RichText::new(&self.cpu_name).strong().color(egui::Color32::WHITE).size(13.0));
+                                ui.add_space(8.0);
+                                
+                                let ram_pct = (self.live_ram / self.live_ram_total.max(0.1)) as f32;
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("SYSTEM RAM").size(10.0).color(egui::Color32::GRAY));
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        ui.label(egui::RichText::new(format!("{:.1} / {:.1} GiB", self.live_ram, self.live_ram_total)).size(11.0).strong());
+                                    });
                                 });
+                                ui.add_space(4.0);
+                                ui.add_sized([ui.available_width(), 4.0], egui::ProgressBar::new(ram_pct).fill(egui::Color32::from_rgb(200, 200, 200)));
                             });
-                        
+                        });
+
                         ui.add_space(10.0);
 
-                        egui::Frame::none()
-                            .fill(egui::Color32::from_rgb(20, 20, 24))
-                            .rounding(8.0)
-                            .inner_margin(12.0)
-                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(35, 35, 40)))
-                            .show(ui, |ui| {
-                                ui.set_min_width(180.0);
-                                ui.vertical(|ui| {
-                                    ui.label(egui::RichText::new("GPU VRAM").size(11.0).color(egui::Color32::from_gray(140)).strong());
-                                    ui.add_space(4.0);
-                                    ui.label(egui::RichText::new(format!("{:.1} / {:.0} GB", self.live_vram, self.live_vram_total)).size(18.0).strong().color(egui::Color32::from_rgb(180, 100, 255)));
-                                    ui.add_space(8.0);
-                                    ui.add_sized([ui.available_width(), 4.0], egui::ProgressBar::new(vram_pct).fill(egui::Color32::from_rgb(180, 100, 255)));
+                        // GPU TILE
+                        egui::Frame::none().fill(egui::Color32::from_rgb(18, 18, 22)).rounding(8.0).inner_margin(12.0).stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(35, 35, 40))).show(ui, |ui| {
+                            ui.set_min_width(260.0);
+                            ui.vertical(|ui| {
+                                ui.label(egui::RichText::new("GRAPHICS ENGINE").size(11.0).color(egui::Color32::from_gray(120)).strong());
+                                ui.label(egui::RichText::new(&self.gpu_name).strong().color(egui::Color32::WHITE).size(13.0));
+                                ui.add_space(8.0);
+                                
+                                // Dedicated VRAM
+                                let ded_pct = (self.live_vram_dedicated / self.live_vram_total.max(0.1)) as f32;
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("DEDICATED").size(10.0).color(egui::Color32::GRAY));
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        ui.label(egui::RichText::new(format!("{:.1} GiB", self.live_vram_dedicated)).size(11.0).strong().color(egui::Color32::from_rgb(180, 100, 255)));
+                                    });
                                 });
+                                ui.add_space(2.0);
+                                ui.add_sized([ui.available_width(), 4.0], egui::ProgressBar::new(ded_pct).fill(egui::Color32::from_rgb(180, 100, 255)));
+                                
+                                ui.add_space(6.0);
+                                // Shared VRAM
+                                let shr_pct = (self.live_vram_shared / self.live_ram_total.max(0.1)) as f32;
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("SHARED").size(10.0).color(egui::Color32::GRAY));
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        ui.label(egui::RichText::new(format!("{:.1} GiB", self.live_vram_shared)).size(11.0).strong().color(egui::Color32::from_rgb(100, 150, 255)));
+                                    });
+                                });
+                                ui.add_sized([ui.available_width(), 4.0], egui::ProgressBar::new(shr_pct).fill(egui::Color32::from_rgb(100, 150, 255)));
                             });
+                        });
+
+                        ui.add_space(10.0);
+
+                        // NPU TILE
+                        egui::Frame::none().fill(egui::Color32::from_rgb(18, 18, 22)).rounding(8.0).inner_margin(12.0).stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(35, 35, 40))).show(ui, |ui| {
+                            ui.set_min_width(260.0);
+                            ui.vertical(|ui| {
+                                ui.label(egui::RichText::new("NEURAL ACCELERATOR").size(11.0).color(egui::Color32::from_gray(120)).strong());
+                                ui.label(egui::RichText::new(&self.npu_name).strong().color(egui::Color32::from_rgb(0, 255, 150)).size(13.0));
+                                ui.add_space(8.0);
+                                
+                                let npu_pct = (self.live_npu_vram / self.live_ram_total.max(0.1)) as f32;
+                                ui.horizontal(|ui| {
+                                    ui.label(egui::RichText::new("ALLOCATED POOL").size(10.0).color(egui::Color32::GRAY));
+                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                                        ui.label(egui::RichText::new(format!("{:.1} GiB", self.live_npu_vram)).size(11.0).strong().color(egui::Color32::from_rgb(0, 255, 150)));
+                                    });
+                                });
+                                ui.add_space(4.0);
+                                ui.add_sized([ui.available_width(), 4.0], egui::ProgressBar::new(npu_pct).fill(egui::Color32::from_rgb(0, 255, 150)));
+                            });
+                        });
                     });
 
                     if self.dl_active {

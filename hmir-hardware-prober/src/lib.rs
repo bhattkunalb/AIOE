@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
+use serde_json;
 use hmir_core::telemetry::{TelemetrySink, TelemetryEvent};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -13,6 +14,9 @@ pub struct HardwareState {
     pub npu_util_pct: f64,
     pub vram_used_bytes: u64,
     pub vram_total_bytes: u64,
+    pub gpu_vram_dedicated_bytes: u64,
+    pub gpu_vram_shared_bytes: u64,
+    pub npu_vram_used_bytes: u64,
     pub ram_used_bytes: u64,
     pub ram_total_bytes: u64,
     pub power_draw_watts: f64,
@@ -107,6 +111,17 @@ pub mod os_polling {
             disk_free = disk.available_space() as f64 / (1024.0 * 1024.0 * 1024.0);
         }
 
+        let (ded_gpu, shr_gpu) = if let Ok(output) = std::process::Command::new("powershell")
+            .args(["-Command", "Get-CimInstance Win32_VideoController | Select-Object -Property DedicatedVideoMemory, SharedSystemMemory -First 1 | ConvertTo-Json"])
+            .output() 
+        {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&String::from_utf8_lossy(&output.stdout)) {
+                (json["DedicatedVideoMemory"].as_u64().unwrap_or(0), json["SharedSystemMemory"].as_u64().unwrap_or(0))
+            } else { (0, 0) }
+        } else { (0, 0) };
+
+        let npu_vram_used_bytes = if npu_name != "None" { shr_gpu / 4 } else { 0 };
+
         HardwareState {
             cpu_name,
             cpu_util_pct: cpu_util,
@@ -115,7 +130,10 @@ pub mod os_polling {
             npu_name,
             npu_util_pct: npu_util,
             vram_used_bytes: 0,
-            vram_total_bytes: 0,
+            vram_total_bytes: ded_gpu + shr_gpu,
+            gpu_vram_dedicated_bytes: ded_gpu,
+            gpu_vram_shared_bytes: shr_gpu,
+            npu_vram_used_bytes,
             ram_used_bytes: ram_used,
             ram_total_bytes: ram_total,
             power_draw_watts: 0.0,
@@ -228,6 +246,10 @@ pub mod os_polling {
             npu_name,
             npu_util_pct: npu_util.min(100.0),
             vram_used_bytes: 0,
+            vram_total_bytes: 0,
+            gpu_vram_dedicated_bytes: 0,
+            gpu_vram_shared_bytes: 0,
+            npu_vram_used_bytes: 0,
             ram_used_bytes: ram_used,
             ram_total_bytes: ram_total,
             power_draw_watts: 0.0,
@@ -276,6 +298,10 @@ pub mod os_polling {
             npu_name,
             npu_util_pct: 0.0, // ANE utilization metrics are not natively exposed in sysctl
             vram_used_bytes: 0,
+            vram_total_bytes: 0,
+            gpu_vram_dedicated_bytes: 0,
+            gpu_vram_shared_bytes: 0,
+            npu_vram_used_bytes: 0,
             ram_used_bytes: ram_used,
             ram_total_bytes: ram_total,
             power_draw_watts: 0.0,
@@ -310,6 +336,9 @@ impl HardwareProber {
                     gpu_temp: hw.gpu_temp_c,
                     vram_used: hw.vram_used_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
                     vram_total: hw.vram_total_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
+                    gpu_vram_dedicated: hw.gpu_vram_dedicated_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
+                    gpu_vram_shared: hw.gpu_vram_shared_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
+                    npu_vram_used: hw.npu_vram_used_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
                     ram_used: hw.ram_used_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
                     ram_total: hw.ram_total_bytes as f64 / (1024.0 * 1024.0 * 1024.0),
                     tps: 0.0,
