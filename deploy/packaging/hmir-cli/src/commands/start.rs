@@ -1,5 +1,4 @@
 use tokio::process::Command;
-use std::path::PathBuf;
 use std::time::Duration;
 
 pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
@@ -15,7 +14,7 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
     bridge_path.push("scripts");
     bridge_path.push("hmir_npu_worker.py");
 
-    let mut bridge_proc = Command::new("python")
+    let bridge_proc = Command::new("python")
         .arg(&bridge_path)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())

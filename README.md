@@ -1,6 +1,6 @@
 # 💎 HMIR ELITE: Heterogeneous Model Inference Runtime
 
-**HMIR (Heterogeneous Model Inference Runtime)** is a high-performance, local-first intelligence engine that orchestrates NPUs, GPUs, and CPUs into a single unified compute fabric. 
+**HMIR (Heterogeneous Model Inference Runtime)** is a high-performance, local-first intelligence engine that orchestrates NPUs, GPUs, and CPUs into a single unified compute fabric.
 
 Built for the "AI PC" era, HMIR prioritizes thermal-efficient NPU execution (Intel AI Boost, Qualcomm Hexagon, Apple Neural Engine) while speculative-scheduling across available GPU clusters to deliver maximum performance-per-watt.
 

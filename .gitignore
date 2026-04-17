@@ -1,6 +1,5 @@
 /target
 /hmir-core/target
-Cargo.lock
 **/*.rs.bk
 tmp/
 /model/

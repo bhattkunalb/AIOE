@@ -131,7 +131,7 @@ jobs:
 
       - name: Publish crates (in dependency order)
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: "${{ secrets.CARGO_REGISTRY_TOKEN }}"
         run: |
           # Only run if --features publish is explicitly enabled
           if cargo metadata --format-version 1 | jq -r '.packages[].features | .publish' | grep -q 'true'; then
