@@ -150,11 +150,13 @@ async def handle_chat(request):
     return response
 
 def handle_health(_request):
-    """Returns the current status of the NPU worker."""
+    """Returns the current status of the NPU worker and active hardware device."""
+    device_name = "Intel NPU (Accelerated)" if OV_PIPE else "None"
     return web.json_response({
         "status": "online" if OV_PIPE else "offline",
         "model": _MODEL_NAME,
-        "device": "NPU"
+        "device": device_name,
+        "backend": "OpenVINO GenAI"
     })
 
 # ── Application Setup ───────────────────────────────────────────────

@@ -5,8 +5,8 @@
 
 pub mod adapters;
 pub mod memory;
+pub mod orchestrator;
 pub mod platform;
 pub mod security;
-pub mod topology;
-pub mod orchestrator;
 pub mod telemetry;
+pub mod topology;

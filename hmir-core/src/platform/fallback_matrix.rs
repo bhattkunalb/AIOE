@@ -1,7 +1,7 @@
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use thiserror::Error;
 use crate::telemetry::TelemetrySink;
+use std::sync::Arc;
+use thiserror::Error;
+use tokio::sync::RwLock;
 
 #[derive(Error, Debug)]
 pub enum FallbackError {
@@ -33,13 +33,13 @@ impl HardwareCompatibilityMatrix {
 
     pub async fn evaluate(&self) -> Result<ExecutionProfile, FallbackError> {
         let mut profile = self.active_profile.write().await;
-        
+
         #[cfg(target_os = "macos")]
         {
             profile.active_device = "Metal".to_string();
             profile.profile_tier = "optimal".to_string();
         }
-        
+
         #[cfg(target_os = "windows")]
         {
             profile.active_device = "DirectML".to_string();

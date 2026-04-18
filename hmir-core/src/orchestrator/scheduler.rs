@@ -20,7 +20,11 @@ impl ExecutionEngine {
 
     /// The core scheduler loop. Triggers iterations of sequence generation while explicitly policing limits.
     pub fn schedule_step(&mut self) {
-        let mut running_count = self.sequences.iter().filter(|s| s.status == SequenceStatus::Running).count();
+        let mut running_count = self
+            .sequences
+            .iter()
+            .filter(|s| s.status == SequenceStatus::Running)
+            .count();
 
         for seq in self.sequences.iter_mut() {
             match seq.status {
@@ -44,12 +48,13 @@ impl ExecutionEngine {
     pub fn watchdog_vram_panic(&mut self) {
         // Pseudo logic: if total `active_vram_blocks_used` exceeds hardware capacities,
         // preempt the youngest sequences down to RAM.
-        
-        let running_seqs: Vec<&mut Sequence> = self.sequences
+
+        let running_seqs: Vec<&mut Sequence> = self
+            .sequences
             .iter_mut()
             .filter(|s| s.status == SequenceStatus::Running)
             .collect();
-            
+
         // Preempt sequences starting from the back
         if running_seqs.len() > self.max_concurrent {
             let overflow = running_seqs.len() - self.max_concurrent;
@@ -73,14 +78,14 @@ mod tests {
     #[test]
     fn test_sequence_lifecycle() {
         let mut seq = Sequence::new(101, 2);
-        
+
         assert_eq!(seq.status, SequenceStatus::Waiting);
-        
+
         seq.status = SequenceStatus::Running;
-        seq.step(); 
+        seq.step();
         assert_eq!(seq.num_tokens_generated, 1);
         assert_eq!(seq.status, SequenceStatus::Running);
-        
+
         seq.step();
         // Finished once Max Tokens limit hits
         assert_eq!(seq.num_tokens_generated, 2);
@@ -98,10 +103,24 @@ mod tests {
 
         engine.schedule_step();
 
-        let running_seqs = engine.sequences.iter().filter(|s| s.status == SequenceStatus::Running).count();
-        let waiting_seqs = engine.sequences.iter().filter(|s| s.status == SequenceStatus::Waiting).count();
+        let running_seqs = engine
+            .sequences
+            .iter()
+            .filter(|s| s.status == SequenceStatus::Running)
+            .count();
+        let waiting_seqs = engine
+            .sequences
+            .iter()
+            .filter(|s| s.status == SequenceStatus::Waiting)
+            .count();
 
-        assert_eq!(running_seqs, 2, "Engine should strictly block at its 2 concurrent maximum limits.");
-        assert_eq!(waiting_seqs, 1, "The third sequence must be indefinitely paused in waiting.");
+        assert_eq!(
+            running_seqs, 2,
+            "Engine should strictly block at its 2 concurrent maximum limits."
+        );
+        assert_eq!(
+            waiting_seqs, 1,
+            "The third sequence must be indefinitely paused in waiting."
+        );
     }
 }

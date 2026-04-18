@@ -10,8 +10,7 @@ services:
     container_name: hmir-daemon
     restart: unless-stopped
     ports:
-      - "8080:8080"  # OpenAI-compatible API
-      - "3001:3001"  # Dashboard UI
+      - "8080:8080"  # Unified API + Web UI
       - "9090:9090"  # Prometheus metrics (optional)
     volumes:
       - hmir-models:/app/models

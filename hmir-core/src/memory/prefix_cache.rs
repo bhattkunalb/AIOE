@@ -13,9 +13,17 @@ pub struct PrefixCache {
     pub shared_blocks: DashMap<PromptHash, Vec<CacheBlockState>>,
 }
 
+impl Default for PrefixCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PrefixCache {
     pub fn new() -> Self {
-        Self { shared_blocks: DashMap::new() }
+        Self {
+            shared_blocks: DashMap::new(),
+        }
     }
 
     pub fn try_match(&self, prompt_tokens: &[u32]) -> Option<Vec<LogicalBlockId>> {
@@ -52,8 +60,8 @@ impl PrefixCache {
             }
         }
     }
-    
+
     fn hash_prompt(&self, _prompt: &[u32]) -> PromptHash {
-        12345678 
+        12345678
     }
 }

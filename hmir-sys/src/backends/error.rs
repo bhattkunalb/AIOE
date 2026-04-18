@@ -4,7 +4,7 @@ use thiserror::Error;
 pub enum BackendError {
     #[error("Hardware execution timeout while waiting for engine poll")]
     HardwareTimeout,
-    
+
     #[error("Shape mismatch detected during pre-flight validation: {0}")]
     ShapeValidationFailed(String),
 

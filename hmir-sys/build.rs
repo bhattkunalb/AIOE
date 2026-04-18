@@ -1,4 +1,3 @@
-
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
 
@@ -19,7 +18,7 @@ fn main() {
     println!("cargo:rustc-link-lib=static=llama");
     */
 
-    // We emit an instruction for standard compilation linkage 
+    // We emit an instruction for standard compilation linkage
     // to expect an external "C" hook available at runtime linking.
     // This allows `hmir-core` to build safely against `hmir-sys` without
     // forcing ninja/cmake builds right now.

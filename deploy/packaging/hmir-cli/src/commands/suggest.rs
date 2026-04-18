@@ -18,7 +18,7 @@ impl ModelRecommender {
 
         println!("🔍 Probing Hardware Layer...");
         let state = os_polling::poll_hardware().await;
-        
+
         println!("✅ CPU: {}", state.cpu_name);
         println!("✅ GPU: {}", state.gpu_name);
         if state.npu_name != "None" {
@@ -26,7 +26,7 @@ impl ModelRecommender {
         } else {
             println!("⚠️  NPU: None detected (Falling back to GPU clusters)");
         }
-        
+
         let (temp_icon, temp_status) = if state.cpu_temp_c < 55.0 {
             ("🟢", "Optimal")
         } else if state.cpu_temp_c < 75.0 {
@@ -34,9 +34,15 @@ impl ModelRecommender {
         } else {
             ("🔴", "Thermal Throttling Threshold")
         };
-        
-        println!("🌡️  Thermals: {:.1}°C {} ({})", state.cpu_temp_c, temp_icon, temp_status);
-        println!("📊 Memory: {:.1} GiB Total Physical RAM", state.ram_total_bytes as f64 / 1_073_741_824.0);
+
+        println!(
+            "🌡️  Thermals: {:.1}°C {} ({})",
+            state.cpu_temp_c, temp_icon, temp_status
+        );
+        println!(
+            "📊 Memory: {:.1} GiB Total Physical RAM",
+            state.ram_total_bytes as f64 / 1_073_741_824.0
+        );
         println!("📈 Strategy: {}-Optimized Performance Routing\n", strategy);
 
         println!("💎 RECOMMENDED INTELLIGENCE TIERS:");
@@ -44,7 +50,10 @@ impl ModelRecommender {
 
         if state.cpu_temp_c > 80.0 {
             println!("🥇 [EFFICIENCY TIER] Phi-3 Mini (4K Instruct)");
-            println!("   • Reason: LOW-POWER mode active due to high thermals ({:.1}°C)", state.cpu_temp_c);
+            println!(
+                "   • Reason: LOW-POWER mode active due to high thermals ({:.1}°C)",
+                state.cpu_temp_c
+            );
             println!("   • Routing: Optimized for CPU/Efficiency Cores");
             println!("   👉 Command: hmir start --model phi-3-mini\n");
         } else if state.npu_name != "None" {
@@ -54,12 +63,18 @@ impl ModelRecommender {
             println!("   👉 Command: hmir start --model qwen2.5-1.5b-ov\n");
 
             println!("🥈 [ULTIMATE TIER] Llama 3.1 8B (INT4 OpenVINO)");
-            println!("   • Reason: High-fidelity reasoning on {} silicon", state.npu_name);
+            println!(
+                "   • Reason: High-fidelity reasoning on {} silicon",
+                state.npu_name
+            );
             println!("   • Stats: ~25 T/s | Balanced Power");
             println!("   👉 Command: hmir start --model llama-3.1-8b-ov\n");
         } else if state.gpu_name.to_uppercase().contains("NVIDIA") {
             println!("🥇 [PERFORMANCE TIER] Llama 3.1 8B (CUDA Native)");
-            println!("   • Reason: NVIDIA GPU cluster detected ({} )", state.gpu_name);
+            println!(
+                "   • Reason: NVIDIA GPU cluster detected ({} )",
+                state.gpu_name
+            );
             println!("   • Stats: High-throughput CUDA routing");
             println!("   👉 Command: hmir start --model llama-3.1-8b-cuda\n");
         } else {
@@ -67,7 +82,7 @@ impl ModelRecommender {
             println!("   • Reason: CPU-dominant execution with partial GPU offloading");
             println!("   👉 Command: hmir start --model mistral-nemo\n");
         }
-        
+
         println!("--------------------------------------------------");
         println!("✨ All models above are optimized for your unique hardware signature.");
     }

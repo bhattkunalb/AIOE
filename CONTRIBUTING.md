@@ -30,8 +30,7 @@ HMIR Workspace (Rust 2021)
 │
 └── examples/
     ├── langchain_hmir.py   # LangChain custom LLM integration
-    ├── openwebui_docker.yml # Docker Compose for Open WebUI + HMIR
-    └── llamaindex_rag.rs   # Rust LlamaIndex example with HMIR API
+    └── openwebui_docker.yml # Docker Compose for Open WebUI + HMIR
 ```
 
 **Key Design Principles**:

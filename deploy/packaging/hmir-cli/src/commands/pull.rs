@@ -1,9 +1,9 @@
+use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use std::path::PathBuf;
 use tokio::fs::{self, File};
 use tokio::io::AsyncWriteExt;
-use futures_util::StreamExt;
 
 pub async fn pull_model(model_name: &str) {
     let url = match model_name {
@@ -34,18 +34,18 @@ pub async fn pull_model(model_name: &str) {
     };
 
     let total_size = res.content_length().unwrap_or(0);
-    
+
     // Setup local path in %LOCALAPPDATA%/hmir/models
     let mut dest_path = dirs::data_local_dir().unwrap_or_else(|| PathBuf::from("."));
     dest_path.push("hmir");
     dest_path.push("models");
-    
+
     if let Err(e) = fs::create_dir_all(&dest_path).await {
         println!("❌ Failed to create models directory: {}", e);
         return;
     }
 
-    let filename = url.split('/').last().unwrap_or("model.bin");
+    let filename = url.split('/').next_back().unwrap_or("model.bin");
     dest_path.push(filename);
 
     println!("📥 Downloading {} to {}", model_name, dest_path.display());

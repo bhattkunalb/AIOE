@@ -46,9 +46,9 @@ mmap = "0.1"
 thiserror = "1.0"
 
 # UI
-egui = "0.26"
-eframe = "0.26"
-egui_plot = "0.26"
+egui = "0.27"
+eframe = "0.27"
+egui_plot = "0.27"
 
 # Backend FFI (bundled, no external install required)
 # Uncomment once the bundled sys crates are generated:

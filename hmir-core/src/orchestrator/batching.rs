@@ -39,12 +39,12 @@ impl Sequence {
         if self.status != SequenceStatus::Running {
             return false;
         }
-        
+
         self.num_tokens_generated += 1;
         if self.num_tokens_generated >= self.max_tokens {
             self.status = SequenceStatus::Finished;
         }
-        
+
         true
     }
 

@@ -35,28 +35,24 @@ impl DraftVerifier {
         max_tokens: usize,
     ) -> Result<Vec<TokenStream>, InferenceError> {
         let mut results = Vec::new();
-        
+
         while results.len() < max_tokens {
             // STEP 1: NPU Draft Generation Sequence
             let draft_horizon = self.draft_config.draft_depth;
-            let mut drafted_tokens = Vec::with_capacity(draft_horizon);
-            
-            for _ in 0..draft_horizon {
-                drafted_tokens.push(111); // Draft token ID stub
-            }
+            let drafted_tokens = vec![111u32; draft_horizon]; // Draft token ID stub
 
             // STEP 2: Unified Tree Attention GPU Verification Array
             let verification_matches = 2; // Verified subset
 
             // STEP 3: Accept Prefix logic & Rollback
-            for i in 0..verification_matches {
+            for &token in drafted_tokens.iter().take(verification_matches) {
                 results.push(TokenStream {
-                    token: drafted_tokens[i],
+                    token,
                     telemetry: format!("draft={}", verification_matches),
                 });
-                prompt.logical_tokens.push(drafted_tokens[i]);
+                prompt.logical_tokens.push(token);
             }
-            
+
             // Execute fallback target if verification completely rejected
             if verification_matches == 0 {
                 results.push(TokenStream {
@@ -64,11 +60,11 @@ impl DraftVerifier {
                     telemetry: "gpu_forced".into(),
                 });
             }
-            
+
             // Phase 7: Mocking Telemetry Emission Non-Blocking Call!
             // get_global_sink().emit(TelemetryEvent::SpeculativeBatch { accepted: 2, rejected: 0, draft_device: "NPU".into() }).unwrap();
         }
-        
+
         Ok(results)
     }
 }

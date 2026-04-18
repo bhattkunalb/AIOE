@@ -15,9 +15,42 @@ param(
 $REPO = "bhattkunalb/HMIR"
 $RELEASE_ENDPOINT = "https://api.github.com/repos/$REPO/releases/latest"
 $API_PORT = 8080
-$DASHBOARD_PORT = 3001
 $MIN_WINDOWS_BUILD = 19041  # Windows 10 20H2
 $REQUIRED_NET_VERSION = "6.0"  # .NET 6+ for some dependencies
+
+# ========================================
+# Maintenance & Purge
+# ========================================
+function Invoke-ForcePurge {
+    Write-Info "🚀 HMIR ELITE | PURGING STALE ENVIRONMENT"
+    
+    # 1. Force kill all related processes
+    $targets = @("hmir", "hmir-api", "hmir-dashboard", "hmir-npu-worker", "hmir-e2e", "python", "uvicorn")
+    foreach ($t in $targets) {
+        $procs = Get-Process -Name $t -ErrorAction SilentlyContinue
+        if ($procs) {
+            Write-Warn "Force killing active process: $t"
+            $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    # 2. Hard Purge Binaries (Rename-to-Delete strategy for locked files)
+    if (Test-Path $InstallPath) {
+        Write-Info "Executing Rename-to-Delete purge in $InstallPath..."
+        $binaries = Get-ChildItem -Path $InstallPath -Filter "*.exe" -ErrorAction SilentlyContinue
+        foreach ($bin in $binaries) {
+            try {
+                # Attempt direct delete
+                Remove-Item $bin.FullName -Force -ErrorAction Stop
+            } catch {
+                # If locked, rename it to .old then try delete again
+                $oldName = "$($bin.FullName).$((Get-Date).Ticks).old"
+                Rename-Item $bin.FullName $oldName -ErrorAction SilentlyContinue
+                Remove-Item $oldName -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
 
 # Colors for output
 $ColorInfo = "Cyan"
@@ -366,6 +399,7 @@ function Main {
     }
     
     Test-SystemRequirements
+    Invoke-ForcePurge
     
     $platform = Get-PlatformInfo
     Write-Info "Detected platform: $($platform.Target)"
@@ -381,8 +415,8 @@ function Main {
     Write-Host "Next steps:" -ForegroundColor $ColorInfo
     Write-Host "  1. Restart PowerShell or run: `$env:PATH = '$InstallPath;' + `$env:PATH"
     Write-Host "  2. Get model recommendations: hmir suggest"
-    Write-Host "  3. Start the daemon: hmir start --dashboard"
-    Write-Host "  4. Open dashboard: http://localhost:$DASHBOARD_PORT"
+    Write-Host "  3. Start the system: hmir start --dashboard"
+    Write-Host "  4. Open dashboard: http://localhost:`$API_PORT"
     Write-Host "  5. API endpoint: http://localhost:$API_PORT/v1/chat/completions"
     Write-Host ""
     Write-Host "Documentation: https://github.com/$REPO/blob/main/README.md" -ForegroundColor $ColorInfo

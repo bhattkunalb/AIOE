@@ -1,8 +1,8 @@
 pub mod task_registry;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
-use tokio::sync::broadcast;
 use thiserror::Error;
+use tokio::sync::broadcast;
 
 #[derive(Error, Debug)]
 pub enum TelemetryError {
@@ -10,47 +10,77 @@ pub enum TelemetryError {
     BroadcastOverflow,
 }
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TelemetryEvent {
-    SequenceStart { id: u64, model: String, strategy: String },
-    TokenGenerated { id: u64, token: u32, device: String, itl_ms: f64 },
-    SpeculativeBatch { accepted: usize, rejected: usize, draft_device: String },
-    MemoryPressure { vram_used: usize, ram_used: usize, swap_rate: f64 },
-    HardwareState { 
-        cpu_util: f64, 
-        gpu_util: f64, 
-        npu_util: f64, 
-        cpu_temp: f64, 
+    SequenceStart {
+        id: u64,
+        model: String,
+        strategy: String,
+    },
+    TokenGenerated {
+        id: u64,
+        token: u32,
+        device: String,
+        itl_ms: f64,
+    },
+    SpeculativeBatch {
+        accepted: usize,
+        rejected: usize,
+        draft_device: String,
+    },
+    MemoryPressure {
+        vram_used: usize,
+        ram_used: usize,
+        swap_rate: f64,
+    },
+    HardwareState {
+        cpu_util: f64,
+        gpu_util: f64,
+        npu_util: f64,
+        cpu_temp: f64,
         gpu_temp: f64,
-        vram_used: f64, 
+        vram_used: f64,
         vram_total: f64,
         gpu_vram_dedicated: f64,
         gpu_vram_shared: f64,
         npu_vram_used: f64,
-        ram_used: f64, 
+        ram_used: f64,
         ram_total: f64,
         tps: f64,
         power_w: f64,
         node_uptime: u64,
         kv_cache: f32,
         cpu_name: String,
+        cpu_cores: u32,
+        cpu_threads: u32,
+        cpu_l3_cache_mb: f64,
         gpu_name: String,
+        gpu_driver: String,
         npu_name: String,
+        npu_driver: String,
         disk_free: f64,
+        disk_total: f64,
+        disk_model: String,
+        ram_speed_mts: u32,
+        engine_status: String,
     },
-    DownloadStatus { 
-        model: String, 
-        status: String, 
+    DownloadStatus {
+        model: String,
+        status: String,
         progress: f32,
     },
-    ModelMounted { name: String, engine: String },
+    ModelMounted {
+        name: String,
+        engine: String,
+    },
 }
 
 pub struct TelemetrySink {
     tx: broadcast::Sender<TelemetryEvent>,
-    tokens_emitted: AtomicUsize, 
+    tokens_emitted: AtomicUsize,
 }
 
 impl TelemetrySink {
@@ -71,8 +101,8 @@ impl TelemetrySink {
         if let TelemetryEvent::TokenGenerated { .. } = event {
             self.tokens_emitted.fetch_add(1, Ordering::Relaxed);
         }
-        
-        let _ = self.tx.send(event); // Swallow receiver-less errors 
+
+        let _ = self.tx.send(event); // Swallow receiver-less errors
         Ok(())
     }
 }

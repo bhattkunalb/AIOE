@@ -1,4 +1,4 @@
-pub mod mapper;
 pub mod draft_policy;
+pub mod mapper;
 
-pub use mapper::{HardwareDevice, ComputeIntent, CostMatrix, DeviceType};
+pub use mapper::{ComputeIntent, CostMatrix, DeviceType, HardwareDevice};

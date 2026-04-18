@@ -1,11 +1,11 @@
-//! Unsafe C-FFI Interface Boundaries 
-//! 
+//! Unsafe C-FFI Interface Boundaries
+//!
 //! This crate contains raw representations of native objects matching their C++ representations.
 
-pub mod ffi_llama;
-pub mod ffi_cuda;
-pub mod ffi_onnx;
 pub mod backends;
+pub mod ffi_cuda;
+pub mod ffi_llama;
+pub mod ffi_onnx;
 
 // Standard testing for verifying ABI memory alignments.
 #[cfg(test)]

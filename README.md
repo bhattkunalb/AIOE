@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/insta
 
 ## 🛰️ Elite Orchestration CLI
 
-The new `hmir` CLI manages the entire lifecycle of your intelligence node.
+The new `hmir` CLI manages the entire lifecycle of your HMIR ELITE Compute Hub.
 
 ### 🔍 Hardware Intelligence Routing
 
@@ -65,7 +65,9 @@ $ hmir suggest
 ```
 
 ### 🚀 Instant Deployment
+
 Start the background daemon and automatically launch the unified web console.
+
 ```bash
 hmir start --dashboard
 ```
@@ -74,29 +76,54 @@ hmir start --dashboard
 
 ## 🖥️ Unified Control Center (Dashboard)
 
-HMIR includes a native, high-performance telemetry dashboard (`hmir-dashboard`) built with Rust and egui.
+HMIR Elite includes a native, high-performance telemetry dashboard built with Rust and egui.
 
+- **Unified Hosting**: API and Web Chat both run on `http://127.0.0.1:8080` (resolves CORS conflicts).
 - **Real-time Silicon Monitoring**: Per-core utilization, NPU throughput, and thermal zones.
 - **VRAM Logic**: Native tracking of dedicated vs. shared video memory.
-- **Intelligence Vault**: One-click NPU model downloads and hot-swapping.
-- **Unified Chat**: Access the local web portal at `http://localhost:8081` for the full chat experience.
+- **Intelligence Vault**: One-click NPU model downloads, hot-swapping, and Clean Eject.
+- **System Transparency**: Streams real-time model download logs directly to the interface.
 
 ---
 
 ## 🏗️ Technical Architecture
 
-- **`hmir-core`**: The heartbeat. Handles the scheduling logic and heterogeneous memory management.
-- **`hmir-hardware-prober`**: Deep silicon discovery across WMI (Windows), sysfs (Linux), and sysctl (macOS).
-- **`hmir-api`**: High-throughput Axum server with OpenAI-compatible endpoint compatibility.
-- **`hmir-npu-worker`**: Execution bridge for OpenVINO and QNN-optimized NPU interference.
+- **`hmir-core`**: The heartbeat. Handles scheduling logic and heterogeneous memory management.
+- **`hmir-hardware-prober`**: Deep silicon discovery across WMI (Windows), sysfs (Linux), and sysctl (macOS). Optimized for Intel AI Boost reporting.
+- **`hmir-api`**: High-throughput Axum server with OpenAI-compatible endpoint compatibility and unified static file hosting.
+- **`hmir-dashboard`**: Native Rust UI (`egui`) for low-overhead system management.
+- **`hmir-npu-worker`**: Execution bridge for OpenVINO and QNN-optimized NPU inference.
 
 ---
 
-## 🤝 Community & Support
+### 🗑️ Uninstallation
 
+To completely remove HMIR ELITE from your system, run the following command in an administrative PowerShell terminal:
+
+```powershell
+hmir uninstall
+```
+
+For a deep clean (including PATH removal), use the standalone script:
+
+```powershell
+irm https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/uninstall.ps1 | iex
+```
+
+Or run locally if you have the source:
+
+```powershell
+.\scripts\uninstall.ps1
+```
+
+### 💎 Community and Support
+
+- **Discord**: Join our community for real-time support and technical discussions.
+- **Documentation**: Visit [docs.hmir.ai](https://docs.hmir.ai) for deep technical specifications.
 - **Repository**: [bhattkunalb/HMIR](https://github.com/bhattkunalb/HMIR)
 - **License**: MIT
 - **Built with**: Rust 🦀, OpenVINO, llama.cpp, egui, axum.
 
 ---
+
 **HMIR: The Silicon-Aware Runtime.**

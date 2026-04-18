@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+// cSpell:ignore USERPROFILE, WINDOWTITLE
 mod commands;
 
 #[derive(Parser)]
@@ -34,6 +35,10 @@ enum Commands {
         #[arg(short, long)]
         model: Option<String>,
     },
+    /// Stop all running HMIR instances
+    Stop,
+    /// Uninstall HMIR ELITE and purge all runtime data
+    Uninstall,
 }
 
 #[tokio::main]
@@ -50,9 +55,65 @@ async fn main() {
             println!("📥 HMIR Model Downloader");
             commands::pull::pull_model(&model).await;
         }
-        Commands::Start { port, dashboard, model } => {
-            println!("🚀 Launching HMIR Inference Node");
+        Commands::Start {
+            port,
+            dashboard,
+            model,
+        } => {
+            println!("🚀 Launching HMIR ELITE Compute Hub");
             commands::start::start_daemon(port, dashboard, model).await;
         }
+        Commands::Stop => {
+            stop_all_instances();
+            println!("✅ HMIR ELITE specialized resources released.");
+        }
+        Commands::Uninstall => {
+            println!("🗑️  HMIR ELITE | COMMENCING FULL SYSTEM UNINSTALL");
+            stop_all_instances();
+
+            println!("  [1/2] Purging application data...");
+            let home = std::env::var("USERPROFILE").unwrap_or_else(|_| ".".to_string());
+            let hmir_dir = std::path::Path::new(&home).join(".hmir");
+
+            if hmir_dir.exists() {
+                match std::fs::remove_dir_all(&hmir_dir) {
+                    Ok(_) => println!("  ✅ Runtime directory purged."),
+                    Err(e) => println!(
+                        "  ⚠️  Partial purge: {}. Manual removal of {} may be required.",
+                        e,
+                        hmir_dir.display()
+                    ),
+                }
+            }
+
+            println!("  [2/2] Cleaning binary environment...");
+            println!("  💡 HMIR executable and PATH entries should be removed manually or via uninstall.ps1.");
+            println!("\n✨ HMIR ELITE has been uninstalled.");
+        }
     }
+}
+
+fn stop_all_instances() {
+    println!("🛑 HMIR ELITE | TERMINATING ALL COMPUTE INSTANCES");
+    println!("  [1/3] Closing Inference API...");
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/IM", "hmir-api.exe", "/T"])
+        .output();
+
+    println!("  [2/3] Closing Hardware Dashboard...");
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/IM", "hmir-dashboard.exe", "/T"])
+        .output();
+
+    println!("  [3/3] Deactivating NPU Bridges...");
+    // Kill any python processes matching the worker pattern
+    let _ = std::process::Command::new("taskkill")
+        .args([
+            "/F",
+            "/IM",
+            "python.exe",
+            "/FI",
+            "WINDOWTITLE eq HMIR_NPU_BRIDGE*",
+        ])
+        .output();
 }

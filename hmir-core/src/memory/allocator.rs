@@ -31,11 +31,11 @@ pub struct MmapTensor {
     pub id: String,
     pub size_bytes: usize,
     /// Memory mapped base pointer (placeholder)
-    pub mapped_ptr: usize, 
+    pub mapped_ptr: usize,
 }
 
 /// The Logical Page Table maps abstract KV Cache blocks across heterogeneous physical memories.
-/// It tracks LRU (Least Recently Used) counters for graceful eviction from VRAM strictly into RAM, 
+/// It tracks LRU (Least Recently Used) counters for graceful eviction from VRAM strictly into RAM,
 /// avoiding OS level paging which causes extreme latencies.
 #[derive(Debug)]
 pub struct LogicalPageTable {
@@ -62,7 +62,11 @@ impl LogicalPageTable {
     /// Attempt to allocate a block in VRAM. If VRAM is full, evict the coldest block to RAM.
     pub fn allocate_vram_block(&mut self, block: LogicalBlockId) -> Result<(), &'static str> {
         self.clock += 1;
-        let vram_count = self.mappings.values().filter(|&s| *s == PageStatus::ResidentVram).count();
+        let vram_count = self
+            .mappings
+            .values()
+            .filter(|&s| *s == PageStatus::ResidentVram)
+            .count();
 
         if vram_count >= self.max_vram_blocks {
             // Trigger Eviction Swap Protocol
@@ -71,7 +75,7 @@ impl LogicalPageTable {
 
         self.mappings.insert(block, PageStatus::ResidentVram);
         self.lru_counter.insert(block, self.clock);
-        
+
         Ok(())
     }
 
@@ -98,7 +102,11 @@ impl LogicalPageTable {
         }
 
         if let Some(cold_block) = coldest {
-            let ram_count = self.mappings.values().filter(|&s| *s == PageStatus::SwappedRam).count();
+            let ram_count = self
+                .mappings
+                .values()
+                .filter(|&s| *s == PageStatus::SwappedRam)
+                .count();
             if ram_count >= self.max_ram_blocks {
                 return Err("Out of Memory (OOM): Both VRAM and System RAM are exhausted.");
             }
@@ -137,7 +145,7 @@ mod tests {
         // Fill VRAM
         assert!(pager.allocate_vram_block(block1).is_ok());
         assert!(pager.allocate_vram_block(block2).is_ok());
-        
+
         assert_eq!(pager.get_status(block1), Some(&PageStatus::ResidentVram));
         assert_eq!(pager.get_status(block2), Some(&PageStatus::ResidentVram));
 
@@ -156,14 +164,17 @@ mod tests {
     fn test_total_oom_guardrail() {
         // 1 VRAM block, 1 RAM block limit
         let mut pager = LogicalPageTable::new(1, 1);
-        
+
         assert!(pager.allocate_vram_block(LogicalBlockId(1)).is_ok());
         assert!(pager.allocate_vram_block(LogicalBlockId(2)).is_ok()); // Pushes 1 to RAM
-        
-        // Block 1 is in RAM, Block 2 is in VRAM. Both are full. 
+
+        // Block 1 is in RAM, Block 2 is in VRAM. Both are full.
         // Adding Block 3 should trigger a hard OOM fallback error matching guardrails.
         let result = pager.allocate_vram_block(LogicalBlockId(3));
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err(), "Out of Memory (OOM): Both VRAM and System RAM are exhausted.");
+        assert_eq!(
+            result.unwrap_err(),
+            "Out of Memory (OOM): Both VRAM and System RAM are exhausted."
+        );
     }
 }

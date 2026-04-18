@@ -1,6 +1,6 @@
 """LangChain integration example for HMIR."""
 
-from langchain_community.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage
 
 # Bind to HMIR exactly exposing native components directly dynamically

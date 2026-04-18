@@ -1,9 +1,9 @@
+use crate::telemetry::task_registry::SequenceId;
+use crate::telemetry::TelemetrySink;
 use dashmap::{DashMap, DashSet};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
-use crate::telemetry::task_registry::SequenceId;
-use crate::telemetry::TelemetrySink;
 
 #[derive(Error, Debug)]
 pub enum AdapterError {
@@ -34,12 +34,15 @@ impl LoRAAdapterManager {
 
     pub async fn load(&self, _path: &str, scale: f32) -> Result<String, AdapterError> {
         let adapter_id = "lora_agent_ext".to_string();
-        
-        self.loaded_adapters.insert(adapter_id.clone(), AdapterState {
-            scale,
-            ref_count: AtomicUsize::new(0),
-            active_sequences: DashSet::new(),
-        });
+
+        self.loaded_adapters.insert(
+            adapter_id.clone(),
+            AdapterState {
+                scale,
+                ref_count: AtomicUsize::new(0),
+                active_sequences: DashSet::new(),
+            },
+        );
 
         Ok(adapter_id)
     }

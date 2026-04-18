@@ -36,9 +36,17 @@ pub struct BlockTable {
     pub routes: HashMap<LogicalId, PhysicalBlockHandle>,
 }
 
+impl Default for BlockTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl BlockTable {
     pub fn new() -> Self {
-        Self { routes: HashMap::new() }
+        Self {
+            routes: HashMap::new(),
+        }
     }
 }
 
@@ -54,7 +62,7 @@ pub struct AttentionOutput {
 }
 
 pub trait PagedBackendAdapter: BackendAdapter {
-    // ENFORCEMENT LINT: 
+    // ENFORCEMENT LINT:
     // Any implementing block MUST push execution to tokio::task::spawn_blocking.
 
     /// Forces the backend engine to ingest a non-contiguous KV Memory pool

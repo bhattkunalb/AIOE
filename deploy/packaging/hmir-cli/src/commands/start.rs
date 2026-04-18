@@ -1,9 +1,9 @@
-use tokio::process::Command;
 use std::time::Duration;
+use tokio::process::Command;
 
 pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
     let mut bin_dir = std::env::current_exe().unwrap_or_default();
-    bin_dir.pop(); 
+    bin_dir.pop();
 
     println!("🚀 HMIR ELITE | INITIALIZING INFERENCE NODE");
     println!("--------------------------------------------------");
@@ -22,7 +22,10 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
 
     match bridge_proc {
         Ok(_) => println!("✅ [OK]"),
-        Err(e) => println!("⚠️ [WARN] Failed to spawn bridge: {}. (Ensure python is in PATH)", e),
+        Err(e) => println!(
+            "⚠️ [WARN] Failed to spawn bridge: {}. (Ensure python is in PATH)",
+            e
+        ),
     }
 
     // 2. Start HMIR API Server
@@ -33,7 +36,7 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
     if let Some(m) = model {
         api_cmd.env("HMIR_DEFAULT_MODEL", m);
     }
-    
+
     match api_cmd.spawn() {
         Ok(_) => {
             // Health check loop
@@ -41,13 +44,17 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
             let mut success = false;
             for _i in 1..=10 {
                 tokio::time::sleep(Duration::from_millis(1000)).await;
-                if let Ok(res) = client.get(format!("http://127.0.0.1:{}/v1/health", port)).send().await {
+                if let Ok(res) = client
+                    .get(format!("http://127.0.0.1:{}/v1/health", port))
+                    .send()
+                    .await
+                {
                     if res.status().is_success() {
                         success = true;
                         break;
                     }
                 }
-                print!("."); 
+                print!(".");
                 let _ = std::io::Write::flush(&mut std::io::stdout());
             }
             if success {
@@ -55,7 +62,7 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
             } else {
                 println!("⚠️ [WARN] API started but health-check timed out. Check logs.");
             }
-        },
+        }
         Err(e) => {
             println!("❌ [ERROR] Failed to start API: {}", e);
             return;
@@ -73,13 +80,15 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
     }
 
     // 4. Auto-Open Web Portal
-    println!("🌐 Auto-opening Web Console: http://localhost:8081");
+    let unified_url = format!("http://127.0.0.1:{}", port);
+    println!("🌐 Auto-opening Web Console: {}", unified_url);
     tokio::time::sleep(Duration::from_secs(2)).await; // Give API time to bind
-    if let Err(e) = webbrowser::open("http://localhost:8081") {
-         println!("⚠️  Unable to open browser: {}", e);
+    if let Err(e) = webbrowser::open(&unified_url) {
+        println!("⚠️  Unable to open browser: {}", e);
     }
 
     println!("--------------------------------------------------");
+    println!("🚀 HMIR API: {}", unified_url);
     println!("💎 Node is running in background.");
     println!("💡 Use 'hmir stop' to terminate all instances.");
 }

@@ -32,10 +32,11 @@ impl BackendAdapter for OnnxRuntimeAdapter {
             // Unsafe FFI C bindings targeting the NPU triggers here
             // unsafe { ffi_onnx::OrtRun( ... ) }
             OrtStatus::Success // mock
-        }).await;
+        })
+        .await;
 
         match exec_result {
-            Ok(OrtStatus::Success) => Ok(10), // drafted K=10 tokens 
+            Ok(OrtStatus::Success) => Ok(10), // drafted K=10 tokens
             Ok(err_code) => Err(BackendError::OnnxExecutionFailed(err_code as i32)),
             Err(_) => Err(BackendError::HardwareTimeout),
         }
@@ -53,12 +54,12 @@ mod tests {
 
     #[test]
     fn test_shape_guardrails() {
-        // Attempting to push a massive 500 element batch tensor through a 
-        // 128 bounded context should be blocked by the adapter's safe pre-flight logic 
+        // Attempting to push a massive 500 element batch tensor through a
+        // 128 bounded context should be blocked by the adapter's safe pre-flight logic
         // BEFORE it hits the `unsafe` block which would crash the program.
-        
+
         let adapter = LlamaCppAdapter::new(128);
-        
+
         let invalid_tensor = TensorShape {
             dim_x: 500,
             dim_y: 1,
@@ -67,21 +68,23 @@ mod tests {
         };
 
         let result = adapter.validate_shape(&invalid_tensor);
-        
+
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err(),
-            BackendError::ShapeValidationFailed("Context token batch size [500] exceeds initialized max limit [128]".to_string())
+            BackendError::ShapeValidationFailed(
+                "Context token batch size [500] exceeds initialized max limit [128]".to_string()
+            )
         );
     }
 
     #[tokio::test]
     async fn test_async_polling_execution() {
         let npu_adapter = OnnxRuntimeAdapter::new(32);
-        
+
         // This validates the asynchronous blocking pool properly compiles and yields
         let result = npu_adapter.evaluate_batch().await;
-        
+
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 10);
     }

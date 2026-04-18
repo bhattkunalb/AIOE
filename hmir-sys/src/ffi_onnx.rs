@@ -25,18 +25,18 @@ extern "C" {
     pub fn OrtCreateSession(
         env: OrtEnvPtr,
         model_path: *const core::ffi::c_char,
-        options: *const c_void
+        options: *const c_void,
     ) -> OrtSessionPtr;
 
     /// Specific function triggering highly efficient static inference loop (for NPU drafting)
     pub fn OrtRun(
         session: OrtSessionPtr,
-        run_options: *const c_void, 
+        run_options: *const c_void,
         input_names: *const *const core::ffi::c_char,
         input_values: *const c_void, // Tensors
         input_count: core::ffi::c_ulong,
         output_names: *const *const core::ffi::c_char,
         output_count: core::ffi::c_ulong,
-        output_values: *mut *mut c_void
+        output_values: *mut *mut c_void,
     ) -> OrtStatus;
 }
