@@ -13,7 +13,7 @@ pub async fn start_daemon(port: u16, dashboard: bool, model: Option<String>) {
     let mut bridge_path = std::env::current_exe().unwrap_or_default();
     bridge_path.pop(); // Remove bin name
     bridge_path.push("scripts");
-    bridge_path.push("hmir_npu_worker.py");
+    bridge_path.push("hmir_npu_service.py");
 
     let bridge_proc = Command::new("python")
         .arg(&bridge_path)

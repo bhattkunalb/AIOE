@@ -11,6 +11,14 @@ RELEASE_ENDPOINT="https://api.github.com/repos/${REPO}/releases/latest"
 INSTALL_DIR="${HOME}/.local/bin"
 DASHBOARD_PORT=3001
 API_PORT=8080
+LOCAL_BUILD=false
+
+# Parse arguments
+for arg in "$@"; do
+  case $arg in
+    --local) LOCAL_BUILD=true ;;
+  esac
+done
 
 # Colors for output
 RED='\033[0;31m'
@@ -68,8 +76,12 @@ install_binaries() {
   local tag
   tag=$(curl -fsSL "${RELEASE_ENDPOINT}" | grep -o '"tag_name": *"[^"]*"' | head -1 | cut -d'"' -f4)
   
-  if [[ -z "$tag" ]]; then
-    log_warn "No releases found yet. Falling back to source build..."
+  if [[ -z "$tag" ]] || [[ "$LOCAL_BUILD" == "true" ]]; then
+    if [[ "$LOCAL_BUILD" == "true" ]]; then
+      log_info "Local install requested (--local flag detected)."
+    else
+      log_warn "No releases found yet. Falling back to source build..."
+    fi
     build_from_source
     return
   fi
@@ -103,7 +115,6 @@ install_binaries() {
 }
 
 # Fallback: build from source
-build_from_source() {
   log_warn "Building HMIR from source (this may take 10-30 minutes)..."
   
   if ! command -v cargo >/dev/null 2>&1; then
@@ -111,10 +122,28 @@ build_from_source() {
     exit 1
   fi
   
-  local tmp_repo
-  tmp_repo=$(mktemp -d)
-  git clone --depth 1 --branch main "https://github.com/${REPO}.git" "${tmp_repo}"
-  cd "${tmp_repo}"
+  local source_dir
+  local tmp_repo=""
+
+  # Detect local source
+  if [[ "$LOCAL_BUILD" == "true" ]] || [[ -f "./Cargo.toml" ]] || [[ -f "../Cargo.toml" ]]; then
+    if [[ -f "./Cargo.toml" ]]; then
+      source_dir=$(pwd)
+    elif [[ -f "../Cargo.toml" ]]; then
+      source_dir=$(realpath ..)
+    fi
+  fi
+
+  if [[ -n "${source_dir:-}" ]]; then
+    log_info "Detected HMIR source at ${source_dir}. Building local version..."
+  else
+    tmp_repo=$(mktemp -d)
+    log_info "Cloning repository to ${tmp_repo}..."
+    git clone --depth 1 --branch main "https://github.com/${REPO}.git" "${tmp_repo}"
+    source_dir="${tmp_repo}"
+  fi
+
+  cd "${source_dir}"
   
   cargo build --release --workspace --features dashboard,openai-api,hardware-prober
   
@@ -122,8 +151,9 @@ build_from_source() {
   cp target/release/hmir target/release/hmir-dashboard "${INSTALL_DIR}/" 2>/dev/null || true
   chmod +x "${INSTALL_DIR}"/hmir*
   
-  cd - >/dev/null
-  rm -rf "${tmp_repo}"
+  if [[ -n "${tmp_repo}" ]]; then
+    rm -rf "${tmp_repo}"
+  fi
   
   log_info "Build complete. Binaries installed to ${INSTALL_DIR}"
 }

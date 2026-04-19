@@ -1,0 +1,15 @@
+# HMIR NPU Dependencies
+# Install via: pip install -r requirements.txt
+
+# Networking & API
+aiohttp>=3.9.5
+
+# Intel NPU Acceleration (OpenVINO)
+openvino==2025.4.0
+openvino-genai==2025.4.0
+
+# Model Management
+huggingface_hub>=0.23.4
+
+# Infrastructure
+requests>=2.32.3

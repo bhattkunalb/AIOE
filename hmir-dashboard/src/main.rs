@@ -86,10 +86,10 @@ impl DashboardApp {
         cmd_tx: mpsc::Sender<DashboardCmd>,
         models_shared: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
     ) -> Self {
-        let _ = std::fs::create_dir_all(format!(
-            "{}\\hmir\\logs",
-            std::env::var("LOCALAPPDATA").unwrap_or_default()
-        ));
+        let mut log_dir = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+        log_dir.push("hmir");
+        log_dir.push("logs");
+        let _ = std::fs::create_dir_all(&log_dir);
 
         let mut style = (*_cc.egui_ctx.style()).clone();
         style.visuals.window_rounding = 8.0.into();
@@ -716,7 +716,11 @@ impl eframe::App for DashboardApp {
                     });
                     ui.add_space(15.0);
 
-                    let log_path = format!("{}\\hmir\\logs\\api.log", std::env::var("LOCALAPPDATA").unwrap_or_default());
+                    let mut log_path = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+                    log_path.push("hmir");
+                    log_path.push("logs");
+                    log_path.push("api.log");
+
                     if let Ok(content) = std::fs::read_to_string(&log_path) {
                         let len = content.len();
                         let start = len.saturating_sub(4000);
@@ -769,24 +773,31 @@ fn main() -> Result<(), eframe::Error> {
                         }
                         DashboardCmd::RestartNode => {
                             let _ = std::process::Command::new("taskkill").args(["/F", "/IM", "hmir-api.exe"]).output();
-                            let hmir_dir = format!("{}/.hmir/hmir-api.exe", std::env::var("USERPROFILE").unwrap_or_default());
-                            let _ = std::process::Command::new("powershell").arg("-Command").arg(format!("Start-Process '{}' -WindowStyle Hidden", hmir_dir)).spawn();
+                            let mut hmir_exe = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+                            hmir_exe.push(".hmir");
+                            hmir_exe.push("hmir-api.exe");
+                            let _ = std::process::Command::new("powershell").arg("-Command").arg(format!("Start-Process '{}' -WindowStyle Hidden", hmir_exe.display())).spawn();
                         }
                         DashboardCmd::ToggleNode(active) => {
                             if !active {
                                 let _ = std::process::Command::new("taskkill").args(["/F", "/IM", "hmir-api.exe"]).output();
                             } else {
-                                let hmir_dir = format!("{}/.hmir/hmir-api.exe", std::env::var("USERPROFILE").unwrap_or_default());
-                                let _ = std::process::Command::new("powershell").arg("-Command").arg(format!("Start-Process '{}' -WindowStyle Hidden", hmir_dir)).spawn();
+                                let mut hmir_exe = dirs::home_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+                                hmir_exe.push(".hmir");
+                                hmir_exe.push("hmir-api.exe");
+                                let _ = std::process::Command::new("powershell").arg("-Command").arg(format!("Start-Process '{}' -WindowStyle Hidden", hmir_exe.display())).spawn();
                             }
                         }
                         DashboardCmd::OpenDir(target) => {
-                            let base_path = format!("{}\\hmir", std::env::var("LOCALAPPDATA").unwrap_or_default());
-                            let path = if target == "models" { format!("{}\\models", base_path) } else { format!("{}\\logs", base_path) };
+                            let mut base_path = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+                            base_path.push("hmir");
+                            let path = if target == "models" { base_path.join("models") } else { base_path.join("logs") };
                             let _ = std::process::Command::new("explorer").arg(path).spawn();
                         }
                         DashboardCmd::BrowseModel => {
-                            let base_path = format!("{}\\hmir\\models", std::env::var("LOCALAPPDATA").unwrap_or_default());
+                            let mut base_path = dirs::data_local_dir().unwrap_or_else(|| std::path::PathBuf::from("."));
+                            base_path.push("hmir");
+                            base_path.push("models");
                             let _ = std::process::Command::new("explorer").arg(base_path).spawn();
                         }
                         DashboardCmd::DownloadModel { repo_id, folder_name } => {

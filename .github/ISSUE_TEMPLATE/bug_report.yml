@@ -1,0 +1,47 @@
+name: 🐛 Bug Report
+description: Report a bug to help us improve HMIR Elite
+title: "[BUG]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug! Please provide as much detail as possible to help us reproduce and fix it.
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: System Logs
+      description: Please include the output of `hmir logs --level debug`.
+      render: shell
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware Configuration
+      description: (e.g. Intel Core Ultra 7 155H, 32GB RAM, Windows 11)
+    validations:
+      required: true

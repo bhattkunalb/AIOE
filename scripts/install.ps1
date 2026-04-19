@@ -6,6 +6,7 @@
 param(
     [switch]$DryRun,
     [switch]$SkipNPUCheck,
+    [switch]$Local,
     [string]$InstallPath = "$env:USERPROFILE\.hmir"
 )
 
@@ -158,9 +159,13 @@ function Install-Binaries {
         return
     }
     
-    if (-not $tag) {
-        Write-Warn "No release tag found. Falling back to source build..."
-        Build-FromSource
+    if (-not $tag -or $Local) {
+        if ($Local) {
+            Write-Info "Local install requested (--Local switch detected)."
+        } else {
+            Write-Warn "No release tag found. Falling back to source build..."
+        }
+        Build-FromSource -UseLocal $Local
         return
     }
     
@@ -220,7 +225,7 @@ function Install-Binaries {
 # Fallback: Build from Source
 # ========================================
 function Build-FromSource {
-    Write-Warn "Building HMIR from source (this may take 20-45 minutes)..."
+    param([switch]$UseLocal)
     
     # Check Rust toolchain
     if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
@@ -229,14 +234,34 @@ function Build-FromSource {
         Write-Host "    Or visit: https://rustup.rs" -ForegroundColor $ColorError
         return
     }
-    
-    # Clone repo to temp
-    $tempRepo = Join-Path $env:TEMP "hmir-source-$((Get-Date).ToString('yyyyMMddHHmmss'))"
-    Write-Info "Cloning repository to $tempRepo..."
-    git clone --depth 1 --branch main "https://github.com/$REPO.git" $tempRepo | Out-Null
+
+    $tempRepo = $null
+    $sourcePath = $null
+
+    if ($UseLocal -or (Test-Path "$PSScriptRoot\..\Cargo.toml") -or (Test-Path ".\Cargo.toml")) {
+        if (Test-Path ".\Cargo.toml") {
+            $sourcePath = Get-Location
+        } elseif (Test-Path "$PSScriptRoot\..\Cargo.toml") {
+            $sourcePath = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent # This is wrong, let's simplify
+            $sourcePath = Resolve-Path "$PSScriptRoot\.."
+        }
+        
+        if ($sourcePath) {
+            Write-Success "Detected HMIR source at $sourcePath. Building local version..."
+        }
+    }
+
+    if (-not $sourcePath) {
+        Write-Warn "Building HMIR from source (this may take 20-45 minutes)..."
+        # Clone repo to temp
+        $tempRepo = Join-Path $env:TEMP "hmir-source-$((Get-Date).ToString('yyyyMMddHHmmss'))"
+        Write-Info "Cloning repository to $tempRepo..."
+        git clone --depth 1 --branch main "https://github.com/$REPO.git" $tempRepo | Out-Null
+        $sourcePath = $tempRepo
+    }
     
     try {
-        Push-Location $tempRepo
+        Push-Location $sourcePath
         
         # Build release (no --features on virtual workspace manifest)
         Write-Info "Building release binaries..."

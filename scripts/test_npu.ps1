@@ -19,5 +19,5 @@ try {
     Write-Host "AI: " -NoNewline
     $Response.choices[0].delta.content
 } catch {
-    Write-Error "❌ Failed to reach NPU worker. Ensure 'python scripts/hmir_npu_worker.py' is running."
+    Write-Error "❌ Failed to reach NPU worker. Ensure 'python scripts/hmir_npu_service.py' is running."
 }

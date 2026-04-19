@@ -1,4 +1,4 @@
-// cSpell:ignore Deque
+// cSpell:ignore Deque venv aiohttp
 use axum::{
     extract::State,
     response::{
@@ -189,7 +189,18 @@ pub async fn download_model(
         script_path.push("scripts");
         script_path.push("download_npu_model.py");
 
-        let mut child = tokio::process::Command::new("python")
+        let venv_python = std::env::current_dir()
+            .unwrap_or_default()
+            .join(".venv")
+            .join("Scripts")
+            .join("python.exe");
+        let python_bin = if venv_python.exists() {
+            venv_python.to_string_lossy().to_string()
+        } else {
+            "python".to_string()
+        };
+
+        let mut child = tokio::process::Command::new(python_bin)
             .arg(script_path)
             .arg(&repo)
             .arg(&folder)
@@ -252,7 +263,7 @@ async fn chat_completions(
         req.stream
     ));
 
-    // Standard NPU Worker port is 8089 (defined in scripts/hmir_npu_worker.py)
+    // Standard NPU Worker port is 8089 (defined in scripts/hmir_npu_service.py)
     let url = "http://127.0.0.1:8089/v1/chat/completions";
     let (tx, rx) = mpsc::channel(128);
 
@@ -265,10 +276,10 @@ async fn chat_completions(
         .await;
 
     if let Err(ref e) = health_ok {
-        log_event(&format!("⚠️  NPU WORKER UNREACHABLE on :8089 — {}", e));
-        log_event("  Hint: Run 'python scripts/hmir_npu_worker.py' or restart with 'hmir start'");
+        log_event(&format!("[WARN] NPU WORKER UNREACHABLE on :8089 - {}", e));
+        log_event("  Hint: Run 'python scripts/hmir_npu_service.py' or restart with 'hmir start'");
     } else {
-        log_event("  NPU Worker health: ✅ ONLINE");
+        log_event("  NPU Worker health: [ONLINE]");
     }
 
     tokio::spawn(async move {
@@ -287,13 +298,13 @@ async fn chat_completions(
             }
             Err(e) => {
                 let detail = if e.is_connect() {
-                    "CONNECTION REFUSED on :8089 — NPU Worker is NOT running. Launch it with: python scripts/hmir_npu_worker.py".to_string()
+                    "CONNECTION REFUSED on :8089 — NPU Worker is NOT running. Launch it with: python scripts/hmir_npu_service.py".to_string()
                 } else if e.is_timeout() {
                     "TIMEOUT — NPU Worker did not respond within 120s. Model may be loading or frozen.".to_string()
                 } else {
                     format!("PROXY ERROR — {}", e)
                 };
-                log_event(&format!("❌ NPU PROXY FAILURE: {}", detail));
+                log_event(&format!("[ERROR] NPU PROXY FAILURE: {}", detail));
                 let err_payload = format!(r#"{{"error": "{}"}}"#, detail.replace('"', "'"));
                 let _ = tx.send(Ok(Event::default().data(err_payload))).await;
                 return;
@@ -303,7 +314,7 @@ async fn chat_completions(
         let status = resp.status();
         if !status.is_success() {
             let body = resp.text().await.unwrap_or_default();
-            log_event(&format!("❌ NPU Worker returned HTTP {}: {}", status, body));
+            log_event(&format!("[ERROR] NPU Worker returned HTTP {}: {}", status, body));
             let _ = tx
                 .send(Ok(Event::default().data(format!(
                     r#"{{"error": "NPU returned HTTP {}: {}"}}"#,
@@ -317,25 +328,34 @@ async fn chat_completions(
         let mut stream = resp.bytes_stream();
         use futures::StreamExt;
         let mut token_count: usize = 0;
+        let mut buffer = String::new();
 
         while let Some(item) = stream.next().await {
             match item {
                 Ok(bytes) => {
-                    let text = String::from_utf8_lossy(&bytes).to_string();
-                    // Each line in our worker SSE is "data: {...}\n\n"
-                    for line in text.lines() {
-                        if line.starts_with("data: ") {
-                            let data = line.strip_prefix("data: ").unwrap_or("");
-                            if !data.is_empty() {
-                                token_count += 1;
-                                let _ = tx.send(Ok(Event::default().data(data))).await;
+                    let chunk_text = String::from_utf8_lossy(&bytes);
+                    buffer.push_str(&chunk_text);
+
+                    while let Some(line_end) = buffer.find("\n\n") {
+                        let full_event = buffer[..line_end].to_string();
+                        buffer = buffer[line_end + 2..].to_string();
+
+                        for line in full_event.lines() {
+                            if line.starts_with("data: ") {
+                                let data = line.strip_prefix("data: ").unwrap_or("").trim();
+                                if !data.is_empty() {
+                                    // Safety: Remove any actual newlines that would cause axum to panic
+                                    let sanitized_data = data.replace('\n', " ").replace('\r', " ");
+                                    token_count += 1;
+                                    let _ = tx.send(Ok(Event::default().data(sanitized_data))).await;
+                                }
                             }
                         }
                     }
                 }
                 Err(e) => {
                     log_event(&format!(
-                        "⚠️  Stream interrupted after {} tokens: {}",
+                        "[WARN] Stream interrupted after {} tokens: {}",
                         token_count, e
                     ));
                     break;
@@ -343,7 +363,7 @@ async fn chat_completions(
             }
         }
         log_event(&format!(
-            "✅ Chat completed — {} tokens streamed",
+            "[DONE] Chat completed - {} tokens streamed",
             token_count
         ));
     });
@@ -379,176 +399,335 @@ async fn health_check() -> Json<serde_json::Value> {
 async fn serve_web_ui() -> Html<&'static str> {
     Html(
         r#"
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>HMIR Elite | Portal</title>
-            <style>
-                :root { --bg: #0a0a0c; --card: #141417; --accent: #00f2ff; --text: #e0e0e0; }
-                body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; margin: 0; display: flex; height: 100vh; overflow: hidden; }
-                .sidebar { width: 240px; background: #000; display: flex; flex-direction: column; border-right: 1px solid #222; }
-                .nav-item { padding: 20px; cursor: pointer; border-left: 4px solid transparent; transition: 0.2s; }
-                .nav-item:hover { background: #111; }
-                .nav-item.active { border-left-color: var(--accent); background: #1a1a1c; }
-                .content { flex: 1; display: flex; flex-direction: column; }
-                .header { background: #1a1a1c; padding: 15px 30px; display: flex; align-items: center; border-bottom: 1px solid #222; justify-content: space-between; }
-                .view { flex: 1; padding: 40px; overflow-y: auto; display: none; }
-                .view.active { display: block; }
-                
-                /* Grid */
-                .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; }
-                .card { background: var(--card); padding: 25px; border-radius: 12px; border: 1px solid #333; }
-                .stat { font-size: 36px; font-weight: 800; color: var(--accent); margin-top: 5px; }
-                
-                /* Chat */
-                .chat-container { height: 100%; display: flex; flex-direction: column; max-width: 900px; margin: 0 auto; position: relative; }
-                .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 15px; }
-                .bubble { padding: 12px 18px; border-radius: 18px; max-width: 80%; line-height: 1.5; font-size: 15px; }
-                .user { background: var(--accent); color: black; align-self: flex-end; }
-                .ai { background: #2a2a2e; align-self: flex-start; }
-                .input-area { padding: 20px; background: #1a1a1c; display: flex; gap: 10px; border-top: 1px solid #333; }
-                input, select { background: #000; border: 1px solid #444; color: white; padding: 12px; border-radius: 6px; outline: none; }
-                button { background: var(--accent); color: black; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-                
-                #model-status { font-size: 12px; color: #888; }
-            </style>
-        </head>
-        <body>
-                <div class="sidebar">
-                <div style="padding: 30px; font-weight: bold; font-size: 20px; color: var(--accent);">HMIR ELITE</div>
-                <div class="nav-item active" onclick="show('monitor', this)">📊 PERFORMANCE</div>
-                <div class="nav-item" onclick="show('chat', this)">💬 AI Chat</div>
-                <div style="flex:1"></div>
-                <div style="padding:20px">
-                    <div style="margin-bottom:8px; font-size:11px">SELECT ENGINE</div>
-                    <select id="model-select" style="width:100%" onchange="mount()">
-                        <option>Loading...</option>
-                    </select>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HMIR Elite | Unified Command</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050507;
+            --glass: rgba(15, 15, 20, 0.8);
+            --border: rgba(255, 255, 255, 0.08);
+            --accent: #00f2ff;
+            --accent-glow: rgba(0, 242, 255, 0.3);
+            --error: #ff3366;
+            --text: #e0e0e0;
+            --text-dim: #909090;
+            --vibrant: #7000ff;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', sans-serif;
+            height: 100vh;
+            display: flex;
+            overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 0% 0%, rgba(0, 242, 255, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 100% 100%, rgba(112, 0, 255, 0.08) 0%, transparent 40%);
+        }
+
+        /* Sidebar Navigation */
+        .sidebar {
+            width: 80px;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 30px 0;
+            z-index: 100;
+        }
+        .logo-box { width: 40px; height: 40px; background: var(--accent); border-radius: 12px; box-shadow: 0 0 20px var(--accent-glow); margin-bottom: 50px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 800; color: black; font-size: 20px; }
+        .nav-icon { width: 45px; height: 45px; border-radius: 12px; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.3s; margin-bottom: 20px; color: var(--text-dim); border: 1px solid transparent; }
+        .nav-icon:hover { background: rgba(255,255,255,0.05); color: white; }
+        .nav-icon.active { background: rgba(0, 242, 255, 0.1); color: var(--accent); border-color: rgba(0, 242, 255, 0.2); }
+
+        /* Unified Layout */
+        .main-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+        .header {
+            height: 80px;
+            padding: 0 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(10px);
+        }
+        .node-info { display: flex; align-items: center; gap: 15px; }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #00ff78; box-shadow: 0 0 10px #00ff78; }
+
+        .content-area { flex: 1; display: grid; grid-template-columns: 1fr 350px; gap: 0; overflow: hidden; }
+
+        /* Left: Intelligence (Chat) */
+        .workspace-panel { 
+            display: flex; 
+            flex-direction: column; 
+            background: rgba(0,0,0,0.2); 
+            border-right: 1px solid var(--border);
+            position: relative;
+        }
+        .chat-history { flex: 1; overflow-y: auto; padding: 40px; scroll-behavior: smooth; }
+        .message { margin-bottom: 30px; line-height: 1.6; font-size: 16px; max-width: 900px; }
+        .msg-role { font-size: 11px; font-weight: 800; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 8px; text-transform: uppercase; }
+        .msg-role.ai { color: var(--accent); }
+        .msg-content { background: rgba(255,255,255,0.02); padding: 20px; border-radius: 16px; border: 1px solid var(--border); }
+        .user .msg-content { border-color: var(--accent-glow); background: rgba(0, 242, 255, 0.03); }
+
+        .chat-controls { padding: 30px 40px; background: rgba(0,0,0,0.3); border-top: 1px solid var(--border); }
+        .input-wrapper { background: var(--glass); border: 1px solid var(--border); border-radius: 16px; display: flex; padding: 10px 15px; transition: 0.3s; }
+        .input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
+        .input-wrapper input { flex:1; background: none; border: none; outline: none; color: white; padding: 10px; font-size: 16px; }
+        .send-btn { background: var(--accent); color: black; border: none; padding: 0 25px; border-radius: 10px; font-weight: 800; cursor: pointer; margin-left:10px; transition: 0.2s; }
+        .send-btn:hover { transform: scale(1.05); }
+
+        /* Right: Infrastructure (Telemetry/Models) */
+        .infra-panel { padding: 30px; overflow-y: auto; display: flex; flex-direction: column; gap: 24px; background: var(--glass); }
+        .panel-title { font-size: 12px; font-weight: 800; color: var(--text-dim); letter-spacing: 1.5px; border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px; }
+        
+        .stat-card { background: rgba(255,255,255,0.03); border: 1px solid var(--border); padding: 20px; border-radius: 16px; }
+        .stat-val { font-size: 28px; font-weight: 800; color: white; display: flex; align-items: baseline; gap: 5px; }
+        .stat-val span { font-size: 14px; color: var(--text-dim); }
+        .stat-label { font-size: 11px; font-weight: 700; color: var(--accent); margin-top: 5px; opacity: 0.8; }
+
+        .model-item { background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 15px; border-radius: 12px; margin-bottom: 12px; transition: 0.3s; }
+        .model-item:hover { border-color: var(--accent); }
+        .model-name { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+        .mount-btn { width: 100%; padding: 10px; border-radius: 8px; border: none; font-weight: 700; cursor: pointer; transition: 0.2s; }
+        .mount-btn.active { background: var(--accent); color: black; }
+        .mount-btn.idle { background: rgba(255,255,255,0.05); color: var(--text); }
+
+        /* Responsive Overlay for small logs */
+        .logs-tray { position: fixed; bottom: 0; left: 80px; right: 350px; height: 40px; background: rgba(0,0,0,0.8); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #666; cursor: pointer; overflow: hidden; white-space: nowrap; z-index: 50; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="logo-box">H</div>
+        <div class="nav-icon active" title="Command Center" onclick="nav('unified')">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+        </div>
+        <div class="nav-icon" title="Hardware Analytics" onclick="location.reload()">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        </div>
+        <div style="flex:1"></div>
+        <div class="nav-icon" title="Unmount All" onclick="eject()" style="color:var(--error); flex-direction: column; height: auto; gap: 4px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
+            <span style="font-size: 8px; font-weight: 800;">UNMOUNT</span>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="header">
+            <div class="node-info">
+                <div class="status-dot"></div>
+                <div style="font-weight: 800; letter-spacing: -0.5px; font-size: 18px;">HMIR ELITE NODE</div>
+                <div style="color: var(--text-dim); font-size: 12px; font-weight: 600;">PORT 8080</div>
+            </div>
+            <div style="display: flex; gap: 20px; align-items: center;">
+                <div id="active-engine" style="font-size: 11px; font-weight: 800; color: var(--accent);">ENGINE: OFFLINE</div>
+            </div>
+        </div>
+
+        <div class="content-area">
+            <!-- INTELLIGENCE PANEL (CHAT) -->
+            <div class="workspace-panel">
+                <div id="chat-hist" class="chat-history">
+                    <div class="message ai">
+                        <div class="msg-role ai">Intelligence Bridge</div>
+                        <div class="msg-content">Welcome to the HMIR Elite Unified Command. My inference engine is bound to your Intel hardware. Ready for instructions.</div>
+                    </div>
+                </div>
+                <div class="chat-controls">
+                    <div class="input-wrapper">
+                        <input id="chat-input" type="text" placeholder="Send an instruction to the NPU..." onkeydown="if(event.key==='Enter') send()">
+                        <button class="send-btn" onclick="send()">EXECUTE</button>
+                    </div>
+                </div>
+                <div id="logs-tray" class="logs-tray">
+                    <span style="color:var(--accent); margin-right: 15px;">[LOGS]</span>
+                    <span id="latest-log-text">Node initialized successfully.</span>
                 </div>
             </div>
-            <div class="content">
-                <div class="header">
-                    <h2 id="view-title">Health & Telemetry</h2>
-                    <div id="model-status">ACTIVE: NONE</div>
-                </div>
-                
-                <div id="monitor" class="view active">
-                    <div class="grid">
-                        <div class="card"><div>THROUGHPUT</div><div id="stat-tps" class="stat">0.0 T/s</div></div>
-                        <div class="card"><div>AI BOOST</div><div id="stat-npu" class="stat">0%</div></div>
-                        <div class="card"><div>VRAM ALLOC</div><div id="stat-vram" class="stat">0.0 GB</div></div>
+
+            <!-- INFRASTRUCTURE PANEL (TELEMETRY) -->
+            <div class="infra-panel">
+                <div>
+                    <div class="panel-title">COMPUTE PERFORMANCE</div>
+                    <div style="display: grid; gap: 15px;">
+                        <div class="stat-card">
+                            <div class="stat-label">NPU UTILIZATION</div>
+                            <div id="stat-npu" class="stat-val">0 <span>%</span></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">THROUGHPUT</div>
+                            <div id="stat-tps" class="stat-val">0.0 <span>TPS</span></div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">VRAM ALLOCATION</div>
+                            <div id="stat-vram" class="stat-val">0.0 <span>GB</span></div>
+                        </div>
                     </div>
                 </div>
 
-                <div id="chat" class="view">
-                    <div class="chat-container">
-                        <div class="messages" id="chat-hist">
-                            <div class="bubble ai">Hello! I am the HMIR AI Interface (NPU-accelerated). Type a message to begin.</div>
-                        </div>
-                        <div class="input-area">
-                            <input type="text" id="chat-input" placeholder="Ask Llama anything..." onkeydown="if(event.key==='Enter') send()">
-                            <button onclick="send()">SEND</button>
-                        </div>
+                <div>
+                    <div class="panel-title">PIPELINES & MODELS</div>
+                    <div id="model-list">
+                        <!-- Loaded dynamically -->
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <script>
-                function show(id, el) {
-                    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-                    document.querySelectorAll('.nav-item').forEach(v => v.classList.remove('active'));
-                    document.getElementById(id).classList.add('active');
-                    el.classList.add('active');
-                    document.getElementById('view-title').innerText = id === 'monitor' ? 'Health & Telemetry' : 'NPU Chat Interface';
-                }
+    <script>
+        const decoder = new TextDecoder();
+        let sseBuffer = "";
 
-                async function loadModels() {
-                    const res = await fetch('/v1/models/installed');
-                    const models = await res.json();
-                    const sel = document.getElementById('model-select');
-                    sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
-                }
+        async function loadModels() {
+            const res = await fetch('/v1/models/installed');
+            const models = await res.json();
+            const list = document.getElementById('model-list');
+            list.innerHTML = models.map(m => `
+                <div class="model-item">
+                    <div class="model-name">${m}</div>
+                    <button class="mount-btn idle" onclick="mount('${m}')">LOAD PIPELINE</button>
+                </div>
+            `).join('');
+        }
 
-                async function mount() {
-                    const name = document.getElementById('model-select').value;
-                    const res = await fetch('/v1/engine/switch', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({name})
-                    });
-                    const data = await res.json();
-                    document.getElementById('model-status').innerText = `ACTIVE: ${data.active.toUpperCase()}`;
-                }
+        async function mount(name) {
+            const engine = document.getElementById('active-engine');
+            engine.innerText = 'ENGINE: LOADING...';
+            const res = await fetch('/v1/engine/switch', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            const data = await res.json();
+            engine.innerText = `ENGINE: ${data.active.toUpperCase()}`;
+        }
 
-                async function send() {
-                    const input = document.getElementById('chat-input');
-                    const hist = document.getElementById('chat-hist');
-                    if(!input.value) return;
+        async function eject() {
+            if(!confirm("Eject and unmount active NPU hardware?")) return;
+            await fetch('/v1/engine/eject', {method: 'POST'});
+            document.getElementById('active-engine').innerText = 'ENGINE: OFFLINE';
+        }
+
+        async function send() {
+            const input = document.getElementById('chat-input');
+            const hist = document.getElementById('chat-hist');
+            if(!input.value) return;
+
+            const text = input.value;
+            input.value = '';
+            
+            hist.innerHTML += `
+                <div class="message user">
+                    <div class="msg-role">Operator</div>
+                    <div class="msg-content">${text}</div>
+                </div>
+            `;
+            
+            const msgEl = document.createElement('div');
+            msgEl.className = 'message ai';
+            msgEl.innerHTML = `
+                <div class="msg-role ai">Intelligence Bridge</div>
+                <div class="msg-content shadow-ai">...</div>
+            `;
+            hist.appendChild(msgEl);
+            const contentEl = msgEl.querySelector('.msg-content');
+            scrollChat();
+
+            try {
+                const res = await fetch('/v1/chat/completions', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({messages: [{role: 'user', content: text}], stream: true})
+                });
+
+                if(!res.ok) throw new Error(await res.text());
+
+                const reader = res.body.getReader();
+                contentEl.innerText = '';
+                let decodingBuffer = "";
+
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+
+                    decodingBuffer += decoder.decode(value, {stream: true});
                     
-                    const userMsg = input.value;
-                    input.value = '';
-                    hist.innerHTML += `<div class="bubble user">${userMsg}</div>`;
-                    
-                    const aiBubble = document.createElement('div');
-                    aiBubble.className = 'bubble ai';
-                    aiBubble.innerText = '...';
-                    hist.appendChild(aiBubble);
-                    hist.scrollTop = hist.scrollHeight;
+                    let boundary;
+                    while((boundary = decodingBuffer.indexOf("\n\n")) >= 0) {
+                        const rawEvent = decodingBuffer.slice(0, boundary);
+                        decodingBuffer = decodingBuffer.slice(boundary + 2);
 
-                    try {
-                        const res = await fetch('/v1/chat/completions', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({messages: [{role: 'user', content: userMsg}], stream: true})
-                        });
-                        
-                        const reader = res.body.getReader();
-                        aiBubble.innerText = '';
-                        while (true) {
-                            const {done, value} = await reader.read();
-                            if (done) break;
-                            const text = new TextDecoder().decode(value);
-                            const lines = text.split('\n');
-                            for (const line of lines) {
-                                if (line.startsWith('data:')) {
-                                    const jsonStr = line.slice(5).trim();
-                                    if (jsonStr === '[DONE]') break;
+                        const lines = rawEvent.split("\n");
+                        for (const line of lines) {
+                            if (line.startsWith("data: ")) {
+                                const jsonStr = line.slice(6).trim();
+                                if (jsonStr === "[DONE]") break;
+                                try {
                                     const json = JSON.parse(jsonStr);
-                                    if (json.error) {
-                                        aiBubble.innerText = '⚠️ ' + json.error;
-                                        aiBubble.style.color = '#ff6b6b';
-                                    } else if (json.choices && json.choices[0].delta.content) {
-                                        aiBubble.innerText += json.choices[0].delta.content;
+                                    const content = json.choices?.[0]?.delta?.content;
+                                    if(content) {
+                                        contentEl.innerText += content;
+                                        scrollChat();
                                     }
+                                } catch(e) {
+                                    // silently catch fragments
                                 }
                             }
                         }
-                    } catch(e) { aiBubble.innerText = '⚠️ Error: ' + e.message + '. Check the PERFORMANCE tab logs for details.'; aiBubble.style.color = '#ff6b6b'; }
+                    }
                 }
+            } catch(e) { 
+                contentEl.innerHTML = `<span style="color:var(--error)">[!] System Error: ${e.message}</span>`;
+            }
+        }
 
-                // Live Telemetry
-                const logSource = new EventSource('/v1/logs');
-                logSource.onmessage = (e) => {
-                    const logLine = e.data;
-                    console.log(logLine);
-                };
+        function scrollChat() {
+            const hist = document.getElementById('chat-hist');
+            hist.scrollTop = hist.scrollHeight;
+        }
 
-                const telemetrySource = new EventSource('/v1/telemetry');
-                telemetrySource.onmessage = (e) => {
-                   const data = JSON.parse(e.data);
-                   if(data.HardwareState) {
-                       const s = data.HardwareState;
-                       document.getElementById('stat-tps').innerText = `${s.tps.toFixed(1)} T/s`;
-                       document.getElementById('stat-npu').innerText = `${s.npu_util.toFixed(0)}%`;
-                       document.getElementById('stat-vram').innerText = `${s.vram_used.toFixed(1)} GB`;
-                   }
-                };
+        // TELEMETRY SSE
+        const tel = new EventSource('/v1/telemetry');
+        tel.onmessage = (e) => {
+            const data = JSON.parse(e.data);
+            if(data.HardwareState) {
+                const s = data.HardwareState;
+                document.getElementById('stat-npu').innerHTML = s.npu_util.toFixed(0) + ' <span>%</span>';
+                document.getElementById('stat-tps').innerHTML = s.tps.toFixed(1) + ' <span>TPS</span>';
+                document.getElementById('stat-vram').innerHTML = s.vram_used.toFixed(1) + ' <span>GB</span>';
+                if(s.engine_status) {
+                    document.getElementById('active-engine').innerText = `ENGINE: ${s.engine_status.toUpperCase()}`;
+                }
+            }
+        };
 
-                loadModels();
-            </script>
-        </body>
-        </html>
-    "#,
+        // LOGS SSE
+        const logs = new EventSource('/v1/logs');
+        logs.onmessage = (e) => {
+            document.getElementById('latest-log-text').innerText = e.data;
+        };
+
+        loadModels();
+    </script>
+</body>
+</html>
+"#,
     )
 }
 
@@ -600,14 +779,14 @@ async fn main() {
             .unwrap_or_default(),
     };
 
-    log_event("HMIR API v2.0.0 STARTING (Unified Port 8080)...");
+    log_event(&format!("HMIR API v2.0.0 STARTING (Port {})...", port));
 
-    // ── Auto-spawn NPU Worker ──────────────────────────────────────
+    // -- Auto-spawn NPU Worker --
     log_event("[BOOT] Launching NPU Inference Worker (port 8089)...");
     let worker_script = std::env::current_dir()
         .unwrap_or_default()
         .join("scripts")
-        .join("hmir_npu_worker.py");
+        .join("hmir_npu_service.py");
 
     if worker_script.exists() {
         // Try project venv first, then system python
@@ -669,7 +848,7 @@ async fn main() {
                         .await
                     {
                         if resp.status().is_success() {
-                            log_event(&format!("  ✅ NPU Worker ONLINE after {}s", attempt * 2));
+                            log_event(&format!("  [ONLINE] NPU Worker ONLINE after {}s", attempt * 2));
                             worker_online = true;
                             break;
                         }
@@ -679,18 +858,18 @@ async fn main() {
                     }
                 }
                 if !worker_online {
-                    log_event("  ⚠️  NPU Worker did not respond within 90s. Chat will fail until worker is ready.");
+                    log_event("  [WARN] NPU Worker did not respond within 90s. Chat will fail until worker is ready.");
                     log_event("  Check: python dependencies (openvino, openvino-genai, aiohttp) and model files.");
                 }
             }
             Err(e) => {
-                log_event(&format!("  ❌ Failed to spawn NPU Worker: {}", e));
+                log_event(&format!("  [WARN] Failed to spawn NPU Worker: {}", e));
                 log_event("  Chat functionality will be unavailable.");
             }
         }
     } else {
         log_event(&format!(
-            "  ⚠️  Worker script not found: {}",
+            "  [WARN] Worker script not found: {}",
             worker_script.display()
         ));
         log_event("  Chat functionality will be unavailable.");
@@ -764,17 +943,17 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", port)).await {
         Ok(l) => l,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
-            eprintln!("❌ [ERROR] Port {} is already in use.", port);
+            eprintln!("[ERROR] Port {} is already in use.", port);
             eprintln!("   Try running 'hmir stop' first, or use a different port with '--port'.");
             std::process::exit(1);
         }
         Err(e) => {
-            eprintln!("❌ [ERROR] Failed to bind to port {}: {}", port, e);
+            eprintln!("[ERROR] Failed to bind to port {}: {}", port, e);
             std::process::exit(1);
         }
     };
-    println!("🚀 HMIR Elite Unified Node: http://127.0.0.1:{}", port);
+    println!("-- HMIR Elite Unified Node: http://127.0.0.1:{}", port);
     if let Err(e) = axum::serve(listener, app).await {
-        eprintln!("❌ [ERROR] Server error: {}", e);
+        eprintln!("[ERROR] Server error: {}", e);
     }
 }

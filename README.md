@@ -1,22 +1,24 @@
-# 💎 HMIR ELITE: Heterogeneous Model Inference Runtime
+# HMIR Elite: Unified Cognitive Hardware Interface
 
-**HMIR (Heterogeneous Model Inference Runtime)** is a high-performance, local-first intelligence engine that orchestrates NPUs, GPUs, and CPUs into a single unified compute fabric.
+![HMIR Elite Banner](assets/hmir_elite_banner.png)
 
-Built for the "AI PC" era, HMIR prioritizes thermal-efficient NPU execution (Intel AI Boost, Qualcomm Hexagon, Apple Neural Engine) while speculative-scheduling across available GPU clusters to deliver maximum performance-per-watt.
+**High-performance unified dashboard and inference engine for heterogeneous compute.**
+
+*Orchestrate local AI across NPUs, GPUs, and CPUs with zero-latency glassmorphic monitoring.*
 
 ---
 
-## ⚡ Power One-Click Install
+## 🚀 One-Command Install
 
-### Windows (AI PC Native)
+HMIR Elite automatically handles hardware probing, driver detection, and environment synchronization.
 
-Run as Administrator in PowerShell to enable deep hardware probing:
+### Windows (PowerShell)
 
 ```powershell
 irm https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.ps1 | iex
 ```
 
-### Linux / macOS
+### Linux & macOS (Bash)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.sh | sh
@@ -24,120 +26,94 @@ curl -fsSL https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/insta
 
 ---
 
-## 🛰️ Elite Orchestration CLI
+## ✨ Why HMIR Elite?
 
-The new `hmir` CLI manages the entire lifecycle of your HMIR ELITE Compute Hub.
+- 💎 **Integrated Glassmorphic Dashboard**: Real-time telemetry for NPU, GPU, and CPU utilization alongside a premium chat interface.
+- ⚡ **Intel® NPU Acceleration**: Native OpenVINO™ execution on Intel AI Boost (Meteor Lake/Core Ultra) hardware for maximum efficiency.
+- 🌊 **Zero-Warning Streaming**: Robust Server-Sent Events (SSE) stability with intelligent boundary reassembly for smooth token generation.
+- 🛠️ **Unified Binary Core**: A single, high-performance Rust/Axum engine managing multiple Python-based hardware microservices.
+- 📦 **Portable isolation**: Fully containerized or isolated virtual environments with automated PATH and dependency management.
 
-### 🔍 Hardware Intelligence Routing
+---
 
-Probes your silicon layer and suggests the optimal intelligence tier for your current thermals and memory pressure.
+## 🏗️ Core Architecture
 
-```bash
-$ hmir suggest
-  _    _ __  __ _____ _____  
- | |  | |  \/  |_   _|  __ \ 
- | |__| | \  / | | | | |__) |
- |  __  | |\/| | | | |  _  / 
- | |  | | |  | |_| |_| | \ \ 
- |_|  |_|_|  |_|_____|_|  \\_\\
+HMIR utilizes a hybrid architecture to bridge high-level cognitive frameworks with low-level hardware acceleration.
 
-[ HMIR ELITE | Intelligence Routing Engine ]
+```mermaid
+graph TD
+    User["Operator (Browser/CLI)"] -->|HTTP/SSE| API["HMIR REST API (Rust/Axum)"]
+    API -->|Real-time Stats| Dashboard["Glassmorphic UI"]
+    API -->|Inference Proxy| NPUWorker["NPU Worker (Python/OpenVINO)"]
+    NPUWorker -->|Native Compute| IntelNPU["Intel® AI Boost (NPU)"]
+    API -.->|Dynamic Fallback| CPU["Unified CPU/GPU Pipeline"]
 
-🔍 Probing Hardware Layer...
-✅ CPU: Intel(R) Core(TM) Ultra 7 155H
-✅ GPU: Intel(R) Arc(TM) Graphics
-✅ NPU: Intel(R) AI Boost (⚡ HIGH-SPEED DETECTED)
-🌡️  Thermals: 42.1°C 🟢 (Optimal)
-📊 Memory: 32.0 GiB Total Physical RAM
-
-💎 RECOMMENDED INTELLIGENCE TIERS:
---------------------------------------------------
-🥇 [ELITE TIER] Qwen 2.5 1.5B (INT4 OpenVINO)
-   • Reason: NATIVE NPU ACCELERATION available via Intel/Qualcomm
-   • Stats: ~120 T/s | Ultra-low Power | 0% CPU Overhead
-   👉 Command: hmir start --model qwen2.5-1.5b-ov
-
-🥈 [ULTIMATE TIER] Llama 3.1 8B (INT4 OpenVINO)
-   • Reason: High-fidelity reasoning on Intel(R) AI Boost silicon
-   • Stats: ~25 T/s | Balanced Power
-   👉 Command: hmir start --model llama-3.1-8b-ov
---------------------------------------------------
+    style IntelNPU fill:#00f2ff,stroke:#00f2ff,color:#000
+    style API fill:#7000ff,stroke:#7000ff,color:#fff
 ```
 
-### 🚀 Instant Deployment
+---
 
-Start the background daemon and automatically launch the unified web console.
+## 🖥️ Hardware Support Matrix
+
+| Target Hardware | Compute Provider | status | Priority |
+| :--- | :--- | :--- | :--- |
+| **Intel® NPU (AI Boost)** | OpenVINO™ GenAI | 🟢 **STABLE** | Elite |
+| **Intel® ARC™ GPU** | OpenVINO / IPEX | 🟢 **STABLE** | Native |
+| **Apple Silicon (M1/M2/M3)** | CoreML / MLX | 🟢 **STABLE** | Native |
+| **NVIDIA RTX™ GPU** | CUDA / TensorRT | 🟡 **BETA** | Proxy |
+| **Unified CPU** | OpenVINO / ONNX | 🟢 **STABLE** | Fallback |
+
+---
+
+## 🛠️ Developer Quick Start
+
+### 1. Interaction via CLI
 
 ```bash
+# Probe hardware and get optimized model recommendations
+hmir suggest
+
+# Start the unified dashboard and inference node
 hmir start --dashboard
 ```
 
----
+### 2. REST API Integration
 
-## 🖥️ Unified Control Center (Dashboard)
-
-HMIR Elite includes a native, high-performance telemetry dashboard built with Rust and egui.
-
-- **Unified Hosting**: API and Web Chat both run on `http://127.0.0.1:8080` (resolves CORS conflicts).
-- **Real-time Silicon Monitoring**: Per-core utilization, NPU throughput, and thermal zones.
-- **VRAM Logic**: Native tracking of dedicated vs. shared video memory.
-- **Intelligence Vault**: One-click NPU model downloads, hot-swapping, and Clean Eject.
-- **System Transparency**: Streams real-time model download logs directly to the interface.
-
----
-
-## 💎 Elite Performance Dashboard
-
-HMIR Elite includes a native, high-performance telemetry dashboard for real-time hardware monitoring.
+HMIR exposes an OpenAI-compatible endpoint at `localhost:8080/v1/chat/completions`.
 
 ```bash
-hmir dashboard
+curl http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Analyze hardware status."}],
+    "stream": true
+  }'
 ```
 
-- **Inference Telemetry**: Track tokens/sec and KV cache utilization.
-- **Hardware Probing**: Real-time NPU/GPU/CPU load and thermals.
-- **Model Management**: Hot-swap models and view VRAM distribution.
+### 3. Local Development (Source Build)
+
+If you are contributing to the core, install from your local clone:
+
+```powershell
+.\scripts\install.ps1 -Local
+```
 
 ---
 
-## 🏗️ Technical Architecture
+## 📂 Repository Structure
 
-- **`hmir-core`**: The heartbeat. Handles scheduling logic and heterogeneous memory management.
-- **`hmir-hardware-prober`**: Deep silicon discovery across WMI (Windows), sysfs (Linux), and sysctl (macOS). Optimized for Intel AI Boost reporting.
-- **`hmir-api`**: High-throughput Axum server with OpenAI-compatible endpoint compatibility and unified static file hosting.
-- **`hmir-dashboard`**: Native Rust UI (`egui`) for low-overhead system management.
-- **`hmir-npu-worker`**: Execution bridge for OpenVINO and QNN-optimized NPU inference.
-
----
-
-### 🗑️ Uninstallation
-
-To completely remove HMIR ELITE from your system, run the following command in an administrative PowerShell terminal:
-
-```powershell
-hmir uninstall
-```
-
-For a deep clean (including PATH removal), use the standalone script:
-
-```powershell
-irm https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/uninstall.ps1 | iex
-```
-
-Or run locally if you have the source:
-
-```powershell
-.\scripts\uninstall.ps1
-```
-
-### 💎 Community and Support
-
-- **Discord**: Join our community for real-time support and technical discussions.
-- **Documentation**: Visit [docs.hmir.ai](https://docs.hmir.ai) for deep technical specifications.
-- **Repository**: [bhattkunalb/HMIR](https://github.com/bhattkunalb/HMIR)
-- **License**: MIT
-- **Built with**: Rust 🦀, OpenVINO, llama.cpp, egui, axum.
+- 🦀 `hmir-api`: High-performance Rust server orchestrating inference and telemetry.
+- 📦 `hmir-core`: Shared hardware abstractions and cognitive utility substrate.
+- 🐍 `scripts`: NPU Service logic and cross-platform installation bridges.
+- 🐳 `deploy`: Multi-stage Docker templates for production distribution.
 
 ---
 
-**HMIR: The Silicon-Aware Runtime.**
+## 🤝 Contributing
+
+We welcome Elite developers to harden the HMIR core. Please see our [CONTRIBUTING.md](file:///c:/Users/silve/OneDrive/Desktop/HMIR/CONTRIBUTING.md) for architectural guidelines and submission standards.
+
+---
+
+**HMIR Elite** • Built with ❤️ for the future of local heterogenous compute.
