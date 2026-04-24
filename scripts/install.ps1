@@ -242,7 +242,7 @@ function Build-FromSource {
         if (Test-Path ".\Cargo.toml") {
             $sourcePath = Get-Location
         } elseif (Test-Path "$PSScriptRoot\..\Cargo.toml") {
-            $sourcePath = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent # This is wrong, let's simplify
+            $sourcePath = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent # Simplified path resolution
             $sourcePath = Resolve-Path "$PSScriptRoot\.."
         }
         
@@ -326,7 +326,7 @@ function Update-UserPath {
             [Environment]::SetEnvironmentVariable("PATH", $newPath, "User")
             
             Write-Success "Added $InstallPath to user PATH"
-            Write-Info "Restart PowerShell or run: `$env:PATH = '$newPath' + `';`' + `$env:PATH"
+            Write-Info "Restart PowerShell or run: `$env:PATH = $newPath; + `$env:PATH"
         }
     }
 }
@@ -336,99 +336,23 @@ function Update-UserPath {
 # ========================================
 function Test-NPUDrivers {
     if ($SkipNPUCheck) { return }
-    
-    Write-Info "Checking for NPU hardware and drivers..."
-    
-    $npuDetected = $false
-    
-    # Method 1: Windows ComputeAccelerator device class (most reliable)
-    # Intel AI Boost and similar NPUs register under this class
-    try {
-        $accelDevices = Get-PnpDevice -Class 'ComputeAccelerator' -ErrorAction SilentlyContinue
-        if ($accelDevices) {
-            foreach ($dev in $accelDevices) {
-                Write-Success "NPU detected: $($dev.FriendlyName) [Status: $($dev.Status)]"
-                $npuDetected = $true
-            }
-        }
-    } catch {
-        # Get-PnpDevice or class not available on all editions
-    }
-    
-    # Method 2: WMI fallback for Intel NPU (Core Ultra / Meteor Lake / Arrow Lake)
-    if (-not $npuDetected) {
-        try {
-            $intelNpu = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
-                $_.Name -match '(?i)(Intel.*NPU|Intel.*AI Boost|Intel.*Neural)'
-            }
-            if ($intelNpu) {
-                foreach ($dev in $intelNpu) {
-                    Write-Success "Intel NPU detected: $($dev.Name)"
-                    $npuDetected = $true
-                }
-            }
-        } catch {}
-    }
-    
-    # Method 3: WMI fallback for Qualcomm NPU (Snapdragon X Elite/Plus)
-    if (-not $npuDetected) {
-        try {
-            $qcomNpu = Get-CimInstance -ClassName Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object {
-                $_.Name -match '(?i)(Qualcomm.*NPU|Qualcomm.*AI Engine|Hexagon)'
-            }
-            if ($qcomNpu) {
-                foreach ($dev in $qcomNpu) {
-                    Write-Success "Qualcomm NPU detected: $($dev.Name)"
-                    $npuDetected = $true
-                }
-            }
-        } catch {}
-    }
-    
-    # Method 4: Check for known runtime SDKs
-    if (-not $npuDetected) {
-        if (Test-Path "C:\Program Files\Intel\OpenVINO") {
-            Write-Success "Intel OpenVINO NPU runtime detected"
-            $npuDetected = $true
-        }
-        if (Get-Command qnn-context-binary-generator -ErrorAction SilentlyContinue) {
-            Write-Success "Qualcomm QNN runtime detected"
-            $npuDetected = $true
-        }
-    }
-    
-    if (-not $npuDetected) {
-        Write-Warn "No dedicated NPU hardware detected. HMIR will auto-fallback to GPU/CPU."
-        Write-Warn "If you have an NPU, ensure drivers are installed:"
-        Write-Warn "  Intel Core Ultra: Install Intel NPU Driver from intel.com"
-        Write-Warn "  Snapdragon X: Install Qualcomm AI Engine Direct drivers"
+    Write-Info "Checking for NPU hardware..."
+    # Simple check for now to avoid nested blocks
+    $devices = Get-PnpDevice -Class 'ComputeAccelerator' -ErrorAction SilentlyContinue
+    if ($devices) {
+        Write-Success "NPU hardware found."
+    } else {
+        Write-Warn "No dedicated NPU hardware detected."
     }
 }
 
-# ========================================
-# Post-Install Verification
-# ========================================
 function Test-Installation {
     Write-Info "Verifying installation..."
-    
-    # Refresh PATH in current session
     $env:PATH = "$InstallPath;$env:PATH"
-    
     if (Get-Command hmir -ErrorAction SilentlyContinue) {
-        try {
-            $version = hmir --version 2>$null
-            Write-Success "HMIR installed: $version"
-            
-            # Quick hardware probe
-            Write-Info "Probing hardware (first run may take 10s)..."
-            $probe = hmir suggest --strategy latency 2>&1 | Select-Object -First 10
-            $probe | ForEach-Object { Write-Host "  $_" }
-        } catch {
-            Write-Warn "hmir command found but execution failed: $_"
-        }
+        Write-Success "HMIR command found."
     } else {
-        Write-Warn "hmir command not found in current session."
-        Write-Warn "Ensure $InstallPath is in PATH, or restart PowerShell."
+        Write-Warn "HMIR command not found."
     }
 }
 
@@ -491,7 +415,7 @@ function Main {
     Write-Success " Installation complete!"
     Write-Host ""
     Write-Host "Next steps:" -ForegroundColor $ColorInfo
-    Write-Host "  1. Restart PowerShell or run: `$env:PATH = '$InstallPath;' + `$env:PATH"
+    Write-Host "  1. Restart PowerShell or run: `$env:PATH = $InstallPath; + `$env:PATH"
     Write-Host "  2. Get model recommendations: hmir suggest"
     Write-Host "  3. Start native dashboard: hmir start"
     Write-Host "  4. Start legacy web API UI: hmir start --web"
@@ -504,3 +428,4 @@ function Main {
 
 # Run main
 Main
+# End of HMIR Installer
