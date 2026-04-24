@@ -186,7 +186,8 @@ pub mod os_polling {
                         "try { $r = Invoke-RestMethod -Uri 'http://127.0.0.1:8089/health' -TimeoutSec 1; if ($r.status -eq 'GENERATING') { '95' } elseif ($r.status -eq 'READY') { '1' } else { '0' } } catch { '0' }"])
                     .output()
                 {
-                    let raw = String::from_utf8_lossy(&output.stdout).trim();
+                    let raw_str = String::from_utf8_lossy(&output.stdout);
+                    let raw = raw_str.trim();
                     if raw.contains("95") {
                         // NPU is actively crunching tokens
                         util = 95.0 + (System::uptime() % 5) as f64; // Slight jitter for realism
