@@ -25,6 +25,7 @@ The design goal is simple:
 - fall back to `GPU`, then `CPU`, without manual reconfiguration
 - keep the serving surface OpenAI-compatible
 - make backend choice visible and explainable
+- provide one-click maintenance via `hmir clean`
 
 Full production architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
@@ -104,6 +105,7 @@ HMIR combines:
 - simple CLI for suggest, pull, serve, logs, and integration flows
 - OpenAI-compatible `/v1/chat/completions`
 - real-time hardware telemetry (CPU, GPU, NPU, RAM, VRAM, disk)
+- **Self-Healing NPU**: Automatic OpenVINO cache recovery and port conflict 'attach' logic
 - explicit logging of selected backend and device
 
 ## 🏗️ Architecture
@@ -209,6 +211,14 @@ hmir download OpenVINO/qwen2.5-1.5b-instruct-int4-ov
 ```
 
 Progress bars show download speed, ETA, and percentage completion.
+
+### 6. Clean runtime caches
+
+```bash
+hmir clean
+```
+
+Purges stale OpenVINO and hardware acceleration caches to resolve loading errors.
 
 ## How It Works
 
