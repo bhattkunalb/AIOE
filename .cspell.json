@@ -60,7 +60,9 @@
     "MTS",
     "winget",
     "SNPE",
-    "QNN"
+    "QNN",
+    "Ryzen",
+    "XDNA"
   ],
   "ignorePaths": [
     "target",
