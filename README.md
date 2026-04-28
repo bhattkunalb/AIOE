@@ -21,11 +21,23 @@ Local LLM deployment is fragmented. One tool excels at NVIDIA CUDA, another at I
 
 HMIR is built as a multi-tier orchestration layer, separating high-performance routing logic from vendor-specific acceleration bridges. It handles the "device capability detection", "plan scoring", and "execution routing" so you don't have to.
 
-## 🚀 Model & Hardware Matrix
+## 🚀 Hardware Scope
+
+HMIR is designed for the modern AI PC, prioritizing dedicated silicon to keep your system responsive while providing universal fallback for cross-platform stability.
+
+### 🧠 Deep Hardware Integration
+
+- **Intel NPU (AI Boost)**: Optimized via OpenVINO for low-power background inference.
+- **Apple Silicon (ANE)**: Native Core ML support for high-efficiency Neural Engine execution.
+- **NVIDIA RT/Tensor Cores**: High-performance CUDA-accelerated fallback.
+- **AMD Ryzen AI**: Emerging support for XDNA-based NPUs via MIGraphX/ROCm.
+- **Qualcomm Hexagon**: Specialized support for Snapdragon X Elite systems.
+
+### 📊 Support Matrix
 
 HMIR automatically routes your model to the most efficient compute unit available. Below is the mapping of hardware vendors to their respective optimization stacks and engines.
 
-### Hardware Acceleration Layer
+#### Acceleration Layer
 
 | Vendor | Compiler | Runtime |
 | :--- | :--- | :--- |
@@ -35,7 +47,7 @@ HMIR automatically routes your model to the most efficient compute unit availabl
 | **Qualcomm** | QNN | SNPE |
 | **Apple** | Core ML tools | Core ML runtime |
 
-### Platform & Engine Mapping
+#### Platform & Engine Mapping
 
 | Platform | Devices | “Engine” (Abstraction Layer) |
 | :--- | :--- | :--- |
@@ -49,7 +61,6 @@ HMIR automatically routes your model to the most efficient compute unit availabl
 
 > [!TIP]
 > HMIR uses a tiered scoring system to select the best "Engine" based on your local silicon configuration. On Intel systems, the **OpenVINO** engine is prioritized for NPU-first execution.
->
 > [!NOTE]
 > For optimal NPU performance on Intel hardware, always look for models with the `-ov` or `OpenVINO` suffix.
 
