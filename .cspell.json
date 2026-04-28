@@ -58,7 +58,9 @@
     "sparklines",
     "Bezier",
     "MTS",
-    "winget"
+    "winget",
+    "SNPE",
+    "QNN"
   ],
   "ignorePaths": [
     "target",
