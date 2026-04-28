@@ -62,7 +62,11 @@
     "SNPE",
     "QNN",
     "Ryzen",
-    "XDNA"
+    "XDNA",
+    "Radeon",
+    "rocm",
+    "MIGraphX",
+    "CoreML"
   ],
   "ignorePaths": [
     "target",

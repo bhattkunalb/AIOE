@@ -85,9 +85,31 @@ HMIR is designed for **Zero-Touch Maintenance**. It includes several self-healin
 - **Port Conflict 'Attach'**: If you try to `hmir start` when a node is already running, the CLI gracefully attaches to the existing instance instead of failing.
 - **System Purge**: Use `hmir clean` to manually reset all hardware acceleration caches if you experience instability after a driver update.
 
-## Quick Start
+## 📦 Installation
+
+### Windows (One-Click Installer)
+
+Open PowerShell as Administrator and run:
+
+```powershell
+irm https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.ps1 | iex
+```
+
+This script handles dependency checks, environment isolation, and creates a desktop shortcut for the **HMIR Dashboard**.
+
+### Manual / Developer Setup
+
+1. Clone the repository: `git clone https://github.com/bhattkunalb/HMIR`
+2. Install Python dependencies: `pip install -r requirements.txt`
+3. Build the CLI: `cargo build --release -p hmir-cli`
+
+---
+
+## 🚀 Quick Start
 
 ### 1. Probe the machine
+
+Automatically detect your silicon and get tailored model recommendations:
 
 ```bash
 hmir suggest
@@ -106,28 +128,26 @@ hmir pull llama3.2-3b
 ### 3. Start the local API + Web Console
 
 ```bash
-hmir start --port 8080 --model qwen2.5-1.5b-ov
+hmir start --model qwen2.5-1.5b-ov
 ```
 
-This starts the API server and opens the web console at `http://localhost:8080`.
+This starts the API server and the **Native Desktop Dashboard**.
 
-### 3a. Start with the native desktop dashboard
+### 3a. Headless mode (API only, no UI)
 
 ```bash
-hmir start --dashboard --model qwen2.5-1.5b-ov
+hmir start --headless --model qwen2.5-1.5b-ov
 ```
 
-### 3b. Headless mode (API only, no UI)
+### 3b. Monitor Status & Hardware
 
 ```bash
-hmir start --no-browser --model qwen2.5-1.5b-ov
-```
-
-### 3c. Monitor Hardware (SMI)
-
-```bash
+hmir status
 hmir smi
 ```
+
+- `status`: High-level health and active model info.
+- `smi`: Detailed per-device utilization (NPU/GPU/CPU).
 
 This opens the high-fidelity **System Management Interface** to monitor your silicon in real-time.
 
