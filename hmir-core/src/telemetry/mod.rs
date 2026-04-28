@@ -14,6 +14,17 @@ use serde::{Deserialize, Serialize};
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProcessInfo {
+    pub pid: u32,
+    pub name: String,
+    pub status: String,
+    pub compute_type: String,
+    pub memory_usage_bytes: u64,
+    pub cpu_usage_pct: f32,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub enum TelemetryEvent {
     SequenceStart {
         id: u64,
@@ -66,6 +77,7 @@ pub enum TelemetryEvent {
         disk_model: String,
         ram_speed_mts: u32,
         engine_status: String,
+        processes: Vec<ProcessInfo>,
     },
     DownloadStatus {
         model: String,

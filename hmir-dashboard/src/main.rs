@@ -93,6 +93,9 @@ pub struct DashboardApp {
     dl_progress: f32,
     config_state: hmir_core::config::HmirConfig,
     show_setup_wizard: bool,
+    live_processes: Vec<hmir_core::telemetry::ProcessInfo>,
+    recommendations: Vec<hmir_core::recommender::Recommendation>,
+    latest_event: Option<TelemetryEvent>,
 }
 
 impl DashboardApp {
@@ -188,6 +191,9 @@ impl DashboardApp {
             dl_progress: 0.0,
             config_state: hmir_core::config::HmirConfig::load(),
             show_setup_wizard: hmir_core::config::HmirConfig::load().default_model.is_none(),
+            live_processes: Vec::new(),
+            recommendations: Vec::new(),
+            latest_event: None,
         }
     }
 
@@ -468,20 +474,18 @@ impl DashboardApp {
                     ui.label(egui::RichText::new("Compute").strong());
                     ui.label(egui::RichText::new("Memory").strong());
                     ui.end_row();
-
-                    let processes = [
-                        ("12840", "hmir-api", "Running", "CPU/NPU", "420 MB"),
-                        ("15922", "hmir-dashboard", "Active", "GPU", "120 MB"),
-                        ("9433", "python (worker)", "Idle", "NPU", "2.4 GB"),
-                    ];
-
-                    for (pid, name, status, compute, mem) in processes {
-                        ui.label(pid);
-                        ui.label(name);
-                        ui.label(egui::RichText::new(status).color(egui::Color32::from_rgb(0, 242, 255)));
-                        ui.label(compute);
-                        ui.label(mem);
+                    if self.live_processes.is_empty() {
+                        ui.label("Waiting for process data...");
                         ui.end_row();
+                    } else {
+                        for proc in &self.live_processes {
+                            ui.label(proc.pid.to_string());
+                            ui.label(&proc.name);
+                            ui.label(egui::RichText::new(&proc.status).color(egui::Color32::from_rgb(0, 242, 255)));
+                            ui.label(&proc.compute_type);
+                            ui.label(format!("{:.0} MB", proc.memory_usage_bytes / 1024 / 1024));
+                            ui.end_row();
+                        }
                     }
                 });
         });
@@ -553,56 +557,23 @@ impl DashboardApp {
         ui.label("Install, inspect, and switch model packs without leaving the dashboard.");
         ui.add_space(12.0);
 
-        let suggestions = if self.npu_name.to_lowercase().contains("apple") {
-            vec![
-                (
-                    "MLX Llama 3.1 8B",
-                    "mlx-community/Llama-3.1-8B-Instruct-4bit",
-                    "llama3.1-8b-mlx",
-                ),
-                (
-                    "MLX Qwen 2.5 7B",
-                    "mlx-community/Qwen2.5-7B-Instruct-4bit",
-                    "qwen2.5-7b-mlx",
-                ),
-            ]
-        } else {
-            vec![
-                (
-                    "OpenVINO Qwen 2.5 1.5B",
-                    "OpenVINO/qwen2.5-1.5b-instruct-int4-ov",
-                    "qwen2.5-1.5b-ov",
-                ),
-                (
-                    "OpenVINO Phi-3 Mini",
-                    "OpenVINO/Phi-3-mini-4k-instruct-int4-ov",
-                    "phi3-mini-ov",
-                ),
-                (
-                    "GGUF Llama 3.2 3B",
-                    "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
-                    "llama3.2-3b",
-                ),
-            ]
-        };
-
         ui.label("Recommended packs");
         ui.horizontal_wrapped(|ui| {
-            for (name, repo, folder) in suggestions {
-                egui::Frame::group(ui.style())
-                    .fill(egui::Color32::from_rgb(19, 23, 28))
-                    .show(ui, |ui| {
-                        ui.set_min_size(egui::vec2(210.0, 90.0));
-                        ui.label(egui::RichText::new(name).strong());
-                        ui.label(folder);
-                        ui.add_space(8.0);
-                        if ui.button("Install").clicked() {
-                            let _ = self.cmd_sender.try_send(DashboardCmd::DownloadModel {
-                                repo_id: repo.to_string(),
-                                folder_name: folder.to_string(),
-                            });
-                        }
-                    });
+            if self.recommendations.is_empty() {
+                ui.label(egui::RichText::new("Warming up Hardware Recommendation Engine...").italics());
+            } else {
+                for rec in &self.recommendations {
+                    self.render_model_card(
+                        ui,
+                        &rec.tier,
+                        &rec.model_name,
+                        &rec.reason,
+                        &rec.stats,
+                        &rec.command,
+                        false,
+                    );
+                    ui.add_space(15.0);
+                }
             }
         });
 
@@ -636,6 +607,68 @@ impl DashboardApp {
                 ui.add_space(8.0);
             }
         });
+    }
+
+    fn render_model_card(
+        &self,
+        ui: &mut egui::Ui,
+        tier: &str,
+        name: &str,
+        reason: &str,
+        stats: &str,
+        command: &str,
+        highlight: bool,
+    ) {
+        let frame_color = if highlight {
+            egui::Color32::from_rgba_unmultiplied(0, 242, 255, 15)
+        } else {
+            egui::Color32::from_rgb(19, 23, 28)
+        };
+
+        let stroke_color = if highlight {
+            egui::Color32::from_rgba_unmultiplied(0, 242, 255, 60)
+        } else {
+            egui::Color32::from_rgba_unmultiplied(255, 255, 255, 10)
+        };
+
+        egui::Frame::group(ui.style())
+            .fill(frame_color)
+            .stroke(egui::Stroke::new(1.0, stroke_color))
+            .rounding(10.0)
+            .show(ui, |ui| {
+                ui.set_min_width(280.0);
+                ui.vertical(|ui| {
+                    ui.label(
+                        egui::RichText::new(tier)
+                            .size(10.0)
+                            .strong()
+                            .color(egui::Color32::from_rgb(0, 242, 255)),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new(name).size(16.0).strong());
+                    ui.add_space(4.0);
+                    ui.label(egui::RichText::new(reason).size(11.0).color(egui::Color32::from_gray(160)));
+                    ui.add_space(8.0);
+                    ui.label(egui::RichText::new(stats).size(10.0).italics().color(egui::Color32::from_gray(120)));
+                    ui.add_space(10.0);
+                    
+                    ui.horizontal(|ui| {
+                        ui.label(egui::RichText::new("CLI:").size(10.0).strong());
+                        ui.code(command);
+                    });
+                    
+                    ui.add_space(8.0);
+                    if ui.button("Install / Sync").clicked() {
+                        // For simplicity, we parse the model id from the command
+                        if let Some(model_id) = command.split("--model ").nth(1) {
+                            let _ = self.cmd_sender.try_send(DashboardCmd::DownloadModel {
+                                repo_id: format!("hmir-models/{}", model_id), // Simplified logic
+                                folder_name: model_id.to_string(),
+                            });
+                        }
+                    }
+                });
+            });
     }
 
     fn render_logs(&mut self, ui: &mut egui::Ui) {
@@ -847,6 +880,7 @@ impl eframe::App for DashboardApp {
                     disk_total,
                     disk_model,
                     ram_speed_mts,
+                    processes,
                     ..
                 } => {
                     self.api_active = true;
@@ -874,6 +908,43 @@ impl eframe::App for DashboardApp {
                     self.live_disk_total = disk_total;
                     self.disk_model = disk_model;
                     self.ram_speed = ram_speed_mts;
+                    self.live_processes = processes;
+                    
+                    // Update recommendations based on new hardware state
+                    let event_copy = TelemetryEvent::HardwareState {
+                        cpu_util: 0.0, // Not needed for recommendation
+                        gpu_util: 0.0,
+                        npu_util,
+                        cpu_temp,
+                        gpu_temp,
+                        vram_used,
+                        vram_total,
+                        gpu_vram_dedicated: 0.0,
+                        gpu_vram_shared: 0.0,
+                        npu_vram_used,
+                        ram_used,
+                        ram_total,
+                        tps,
+                        power_w: 0.0,
+                        node_uptime,
+                        kv_cache,
+                        cpu_name: self.cpu_name.clone(),
+                        cpu_cores,
+                        cpu_threads,
+                        cpu_l3_cache_mb,
+                        gpu_name: self.gpu_name.clone(),
+                        gpu_driver: self.gpu_driver.clone(),
+                        npu_name: self.npu_name.clone(),
+                        npu_driver: self.npu_driver.clone(),
+                        disk_free,
+                        disk_total,
+                        disk_model: self.disk_model.clone(),
+                        ram_speed_mts,
+                        engine_status: String::new(),
+                        processes: self.live_processes.clone(),
+                    };
+                    self.recommendations = hmir_core::recommender::ModelRecommender::suggest_for_hardware(&event_copy);
+                    self.latest_event = Some(event_copy);
                 }
                 TelemetryEvent::DownloadStatus {
                     model,

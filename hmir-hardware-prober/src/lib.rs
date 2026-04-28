@@ -34,6 +34,7 @@ pub struct HardwareState {
     pub disk_model: String,
     pub engine_status: String,
     pub uptime_secs: u64,
+    pub processes: Vec<hmir_core::telemetry::ProcessInfo>,
 }
 
 #[cfg(target_os = "windows")]
@@ -251,7 +252,43 @@ pub mod os_polling {
             disk_model,
             engine_status: "Unmounted".to_string(),
             uptime_secs: System::uptime(),
+            processes: poll_hmir_processes(&mut sys),
         }
+    }
+
+    fn poll_hmir_processes(sys: &mut System) -> Vec<hmir_core::telemetry::ProcessInfo> {
+        sys.refresh_processes();
+        let mut results = Vec::new();
+
+        for (pid, process) in sys.processes() {
+            let name = process.name();
+            // Match hmir processes or python worker
+            if name.contains("hmir-api") || name.contains("hmir-dashboard") || name.contains("python") {
+                let cmd = process.cmd().join(" ");
+                // Filter python processes to only include our worker
+                if name.contains("python") && !cmd.contains("hmir_npu_service.py") {
+                    continue;
+                }
+
+                let compute_type = if name.contains("hmir-api") {
+                    "CPU/Watchdog"
+                } else if name.contains("hmir-dashboard") {
+                    "GPU/UI"
+                } else {
+                    "NPU/Compute"
+                };
+
+                results.push(hmir_core::telemetry::ProcessInfo {
+                    pid: pid.as_u32(),
+                    name: name.to_string(),
+                    status: format!("{:?}", process.status()),
+                    compute_type: compute_type.to_string(),
+                    memory_usage_bytes: process.memory(),
+                    cpu_usage_pct: process.cpu_usage(),
+                });
+            }
+        }
+        results
     }
 
     fn probe_accelerators() -> (String, String) {
@@ -388,6 +425,7 @@ pub mod os_polling {
             ram_speed_mts: 0,
             engine_status: "Unmounted".to_string(),
             uptime_secs: System::uptime(),
+            processes: Vec::new(),
         }
     }
 }
@@ -459,6 +497,7 @@ pub mod os_polling {
             disk_model: "Apple SSD".to_string(),
             engine_status: "Unmounted".to_string(),
             uptime_secs: System::uptime(),
+            processes: Vec::new(),
         }
     }
 }
@@ -510,6 +549,7 @@ impl HardwareProber {
                     disk_model: hw.disk_model.clone(),
                     ram_speed_mts: hw.ram_speed_mts,
                     engine_status: hw.engine_status.clone(),
+                    processes: hw.processes.clone(),
                 });
             }
         });

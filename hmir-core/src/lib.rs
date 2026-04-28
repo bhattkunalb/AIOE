@@ -11,3 +11,4 @@ pub mod security;
 pub mod telemetry;
 pub mod topology;
 pub mod config;
+pub mod recommender;

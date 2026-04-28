@@ -764,6 +764,7 @@ async fn main() {
                 disk_model: hw.disk_model.clone(),
                 ram_speed_mts: hw.ram_speed_mts,
                 engine_status: current_status,
+                processes: hw.processes,
             };
 
             // Store snapshot in history ring buffer for /v1/hardware/history
