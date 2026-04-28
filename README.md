@@ -1,19 +1,37 @@
-# HMIR
+# HMIR: Heterogeneous Model Inference Runtime
 
 ![HMIR Banner](assets/hmir_elite_banner.png)
 
-> Run one local LLM service across NPU, GPU, and CPU with NPU-first scheduling and automatic fallback.
+> **The Universal Local Inference Engine for the AI PC Era.**
+>
+> HMIR (Heterogeneous Model Inference Runtime) is a unified inference platform that orchestrates LLMs across **NPU, GPU, and CPU** with NPU-first scheduling and transparent fallback. Stop juggling backend-specific SDKs and start targeting one universal local endpoint.
 
-HMIR is a heterogeneous local inference runtime for Windows, Linux, and macOS. It detects the hardware available on the machine, selects the best backend for the requested model, and exposes one developer-friendly API instead of forcing users to hand-pick devices and runtimes.
+## 🌟 Why HMIR?
 
-## Troubleshooting NPU Usage
+Local LLM deployment is fragmented. One tool excels at NVIDIA CUDA, another at Intel OpenVINO, and CPU fallback is often an afterthought. HMIR closes this gap by providing a **single, hardware-aware abstraction layer** that:
 
-If Windows Task Manager shows **0% NPU** usage while you are chatting:
+- **Prioritizes Efficiency**: Runs on the NPU (AI Boost) by default to save battery and keep your GPU free.
+- **Zero-Config Fallback**: Automatically spills over to iGPU or CPU if the NPU is overloaded or incompatible.
+- **OpenAI Compatible**: Drop-in replacement for any app using the OpenAI SDK.
+- **Real-time Telemetry**: Full visibility into hardware utilization across all silicon engines.
 
-1. **Check HMIR Dashboard**: The HMIR Dashboard (native and web) tracks the internal engine state. If the dashboard shows high NPU utilization, the NPU is active.
-2. **Task Manager Limitation**: Windows Task Manager often fails to capture high-frequency burst OpenVINO GenAI workloads because the NPU execution happens in micro-bursts that are faster than the Task Manager polling rate.
-3. **Model Compatibility**: Ensure you are using a `-ov` (OpenVINO) model. GGUF models run on CPU/GPU via llama.cpp and will not utilize the NPU.
-4. **NPU Drivers**: Ensure you have the latest Intel NPU drivers (version 31.0.100.xxxx or higher).
+---
+
+## 🚀 Model & Hardware Matrix
+
+HMIR automatically routes your model to the most efficient compute unit available.
+
+| Target HW | Engine | Preferred Format | Optimization | Example Models |
+| :--- | :--- | :--- | :--- | :--- |
+| **Intel NPU** | OpenVINO GenAI | OpenVINO IR | INT4 / Weight Compression | `qwen2.5-ov`, `phi3-mini-ov` |
+| **Intel iGPU** | OpenVINO GenAI | OpenVINO IR | FP16 / INT8 | `phi3-mini-ov`, `llama3-ov` |
+| **NVIDIA GPU** | llama.cpp (CUDA) | GGUF | Q4_K_M / Q8_0 | `llama3.2-3b`, `mistral-v0.3` |
+| **Apple M-Series** | llama.cpp (Metal) | GGUF | Q4_0 / Q5_K_M | `phi3-medium`, `llama3.2` |
+| **AMD GPU** | llama.cpp (ROCm) | GGUF | Q4_K_M | `deepseek-v2-lite` |
+| **System CPU** | llama.cpp (AVX/AMX) | GGUF | Q4_K_M / Q2_K | *Any supported GGUF model* |
+
+> [!NOTE]
+> For optimal NPU performance on Intel hardware, always look for models with the `-ov` or `OpenVINO` suffix.
 
 ---
 
@@ -110,12 +128,34 @@ HMIR combines:
 
 ## 🏗️ Architecture
 
+HMIR is built as a multi-tier orchestration layer, separating high-performance routing logic from vendor-specific acceleration bridges.
+
+### 1. The Rust Orchestrator (`hmir-core`)
+
+The brain of the system. It handles:
+
+- **Telemetry Aggregation**: High-frequency polling of NPU, GPU, and CPU load.
+- **NPU-First Scheduler**: Scores candidate devices based on available memory, power profile, and model compatibility.
+- **Request Routing**: Proxies OpenAI-compatible requests to the active execution bridge.
+
+### 2. The Execution Bridges (`hmir-sys`)
+
+Lean, specialized workers that interface with native hardware SDKs:
+
+- **OpenVINO Bridge**: A Python-based worker using `openvino-genai` for low-latency NPU/iGPU execution.
+- **llama.cpp Bridge**: A native C++ binding for high-compatibility GGUF execution on CUDA/Metal/CPU.
+
+### 3. The UI Layer
+
+- **Web Console**: A premium, browser-based dashboard at `http://localhost:8080`.
+- **Native Dashboard**: A lightweight desktop GUI for system-tray control and rapid chat.
+
 ```mermaid
 graph TD
     User([User / SDK / CLI]) --> API[HMIR API Layer]
     Browser([Web Console]) --> API
     Dashboard([Native Dashboard]) --> API
-    subgraph Core ["HMIR ELITE CORE"]
+    subgraph Core ["HMIR ELITE CORE (Rust)"]
         API --> Sched[NPU-First Scheduler]
         Sched --> MM[Model Manager]
         Sched --> Det[Hardware Detector]
@@ -123,8 +163,8 @@ graph TD
         Det --> Engine
     end
     subgraph Backends ["ACCELERATION LAYER"]
-        Engine --> OV[OpenVINO Backend]
-        Engine --> LCPP[llama.cpp Backend]
+        Engine --> OV[OpenVINO Bridge]
+        Engine --> LCPP[llama.cpp Bridge]
         OV --> NPU[Intel NPU / AI Boost]
         OV --> iGPU[Intel UHD/Iris GPU]
         LCPP --> dGPU[Discrete GPU / CUDA]
@@ -132,20 +172,13 @@ graph TD
     end
 ```
 
-## 🚀 Model Matrix
+## 🛠️ Self-Healing & Maintenance
 
-| HW Target | Preferred Format | Engine | Example Alias |
-| --- | --- | --- | --- |
-| **Intel NPU** | OpenVINO IR | `OpenVINO` | `qwen2.5-1.5b-ov` |
-| **Intel iGPU** | OpenVINO IR | `OpenVINO` | `phi3-mini-ov` |
-| **NVIDIA GPU** | GGUF | `llama.cpp` | `llama3.2-3b` |
-| **Apple ANE** | CoreML / GGUF | `llama.cpp` | `phi3-mini` |
-| **System CPU** | GGUF | `llama.cpp` | `llama3-8b-gguf` |
+HMIR is designed for **Zero-Touch Maintenance**. It includes several self-healing mechanisms to ensure high availability:
 
-Rule:
-
-- use `OpenVINO IR` packs with `OpenVINO`
-- use `GGUF` packs with `llama.cpp`
+- **Automatic Cache Recovery**: If a model load fails due to a corrupt OpenVINO cache, HMIR automatically purges the stale cache and retries, preventing "stuck" engine states.
+- **Port Conflict 'Attach'**: If you try to `hmir start` when a node is already running, the CLI gracefully attaches to the existing instance instead of failing.
+- **System Purge**: Use `hmir clean` to manually reset all hardware acceleration caches if you experience instability after a driver update.
 
 ## Quick Start
 
@@ -301,6 +334,29 @@ hmir logs --follow
 ```
 
 Or use the web console's **Logs** tab for live, filterable log viewing.
+
+## 🔍 Troubleshooting NPU Usage
+
+If your hardware isn't behaving as expected, check these common scenarios:
+
+### 1. Task Manager shows 0% NPU
+
+Windows Task Manager often fails to capture high-frequency burst OpenVINO GenAI workloads. Use the **HMIR Dashboard** telemetry for the most accurate view of NPU utilization.
+
+### 2. Model Loading Errors
+
+If a model fails to mount, it is often due to a stale backend cache. Run:
+
+```bash
+hmir clean
+```
+
+### 3. Driver Requirements
+
+- **Intel NPU**: Requires driver version `31.0.100.xxxx` or higher.
+- **NVIDIA**: Requires CUDA `12.x` for optimal GGUF acceleration.
+
+---
 
 ## MVP Scope
 
