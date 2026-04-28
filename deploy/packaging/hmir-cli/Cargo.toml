@@ -17,3 +17,5 @@ clap = { version = "4.4", features = ["derive"] }
 indicatif = "0.17"
 futures-util = "0.3"
 webbrowser = "0.8"
+comfy-table = "7.1"
+colored = "2.1"

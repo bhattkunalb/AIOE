@@ -45,6 +45,7 @@ pub struct AppState {
     pub client: reqwest::Client,
     pub hardware_history: Arc<Mutex<VecDeque<serde_json::Value>>>,
     pub latest_hardware: Arc<Mutex<serde_json::Value>>,
+    pub config: Arc<hmir_core::config::HmirConfig>,
 }
 
 #[derive(Deserialize)]
@@ -207,7 +208,7 @@ pub async fn switch_model(
     if engine == "OPENVINO/NPU" {
         let client = reqwest::Client::new();
         match client
-            .post("http://127.0.0.1:8089/v1/engine/load")
+            .post(format!("http://127.0.0.1:{}/v1/engine/load", state.config.worker_port))
             .json(&serde_json::json!({ "name": payload.name }))
             .send()
             .await
@@ -358,13 +359,13 @@ async fn chat_completions(
     ));
 
     // Standard NPU Worker port is 8089 (defined in scripts/hmir_npu_service.py)
-    let url = "http://127.0.0.1:8089/v1/chat/completions";
+    let url = format!("http://127.0.0.1:{}/v1/chat/completions", state.config.worker_port);
     let (tx, rx) = mpsc::channel(128);
 
     // Pre-flight: check if NPU worker is reachable and READY
     let health_resp = state
         .client
-        .get("http://127.0.0.1:8089/health")
+        .get(format!("http://127.0.0.1:{}/health", state.config.worker_port))
         .timeout(std::time::Duration::from_secs(2))
         .send()
         .await;
@@ -382,7 +383,7 @@ async fn chat_completions(
             }
         }
         Err(e) => {
-            log_event(&format!("[WARN] NPU WORKER UNREACHABLE on :8089 - {}", e));
+            log_event(&format!("[WARN] NPU WORKER UNREACHABLE on :{} - {}", state.config.worker_port, e));
             log_event("  Hint: Run 'python scripts/hmir_npu_service.py' or restart with 'hmir start'");
         }
     }
@@ -403,7 +404,7 @@ async fn chat_completions(
             }
             Err(e) => {
                 let detail = if e.is_connect() {
-                    "CONNECTION REFUSED on :8089 — NPU Worker is NOT running. Launch it with: python scripts/hmir_npu_service.py".to_string()
+                    format!("CONNECTION REFUSED on :{} — NPU Worker is NOT running. Launch it with: python scripts/hmir_npu_service.py", state.config.worker_port)
                 } else if e.is_timeout() {
                     "TIMEOUT — NPU Worker did not respond within 120s. Model may be loading or frozen.".to_string()
                 } else {
@@ -545,10 +546,9 @@ async fn log_stream(
 
 #[tokio::main]
 async fn main() {
-    let port: u16 = std::env::var("HMIR_PORT")
-        .ok()
-        .and_then(|p| p.parse().ok())
-        .unwrap_or(8080);
+    // -- Load Config --
+    let config = hmir_core::config::HmirConfig::load();
+    let port = config.api_port;
 
     let telemetry = hmir_core::telemetry::TelemetrySink::new(1024);
     let telemetry_arc = std::sync::Arc::new(telemetry);
@@ -572,12 +572,13 @@ async fn main() {
             .unwrap_or_default(),
         hardware_history: hardware_history.clone(),
         latest_hardware: latest_hardware.clone(),
+        config: Arc::new(config.clone()),
     };
 
     log_event(&format!("HMIR API v2.0.0 STARTING (Port {})...", port));
 
     // -- Auto-spawn NPU Worker --
-    log_event("[BOOT] Launching NPU Inference Worker (port 8089)...");
+    log_event(&format!("[BOOT] Launching NPU Inference Worker (port {})...", config.worker_port));
     let worker_script = resolve_script_path("hmir_npu_service.py");
 
     // Resolve the project root for setting working directory on spawned processes
@@ -608,6 +609,8 @@ async fn main() {
         match std::process::Command::new(&python_bin)
             .arg("-u")
             .arg(&worker_script)
+            .arg("--port")
+            .arg(config.worker_port.to_string())
             .current_dir(&project_root)
             .env("HMIR_MODEL_PATH", &model_path)
             .stdout(Stdio::piped())

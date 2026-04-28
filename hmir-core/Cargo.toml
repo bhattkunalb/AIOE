@@ -15,6 +15,9 @@ dashmap = "5.5"
 fastrand = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 tokio = { version = "1.28", features = ["full", "rt-multi-thread"] }
+dirs = "5.0"
+toml = "0.8"
+serde_json = "1.0"
 
 # num_cpus = "1.15.0"
 # hwloc2 = "2.2"   # Simulating for now

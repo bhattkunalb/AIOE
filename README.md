@@ -116,6 +116,8 @@ After install, HMIR probes local hardware automatically and routes across `NPU`,
 - **Self-Healing**: Automatic cache recovery and port-conflict "attach" logic.
 - **API First**: OpenAI-compatible `/v1/chat/completions` endpoint.
 - **Live Telemetry**: Real-time polling of NPU, GPU, CPU, RAM, and Disk.
+- **SMI Tool**: High-fidelity terminal monitoring via `hmir smi`.
+- **Persistent Config**: Easy port and performance management via `config.toml`.
 
 ## 🏗️ Architecture
 
@@ -209,7 +211,15 @@ hmir start --dashboard --model qwen2.5-1.5b-ov
 hmir start --no-browser --model qwen2.5-1.5b-ov
 ```
 
-### 3c. Source Build Execution
+### 3c. Monitor Hardware (SMI)
+
+```bash
+hmir smi
+```
+
+This opens the high-fidelity **System Management Interface** to monitor your silicon in real-time.
+
+### 3d. Source Build Execution
 
 If you are developing or prefer to run directly from source instead of using the installed `hmir` binary, you can use Cargo:
 

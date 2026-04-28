@@ -28,6 +28,7 @@ enum Tab {
     Chat,
     Models,
     Logs,
+    Settings,
 }
 
 pub enum DashboardCmd {
@@ -43,6 +44,7 @@ pub enum DashboardCmd {
     DismountModel,
     SendChat(String),
     ClearChat,
+    SaveConfig(hmir_core::config::HmirConfig),
 }
 
 pub struct DashboardApp {
@@ -88,6 +90,8 @@ pub struct DashboardApp {
     dl_model: String,
     dl_status: String,
     dl_progress: f32,
+    config_state: hmir_core::config::HmirConfig,
+    show_setup_wizard: bool,
 }
 
 impl DashboardApp {
@@ -181,6 +185,8 @@ impl DashboardApp {
             dl_model: String::new(),
             dl_status: String::new(),
             dl_progress: 0.0,
+            config_state: hmir_core::config::HmirConfig::load(),
+            show_setup_wizard: hmir_core::config::HmirConfig::load().default_model.is_none(),
         }
     }
 
@@ -623,10 +629,113 @@ impl DashboardApp {
                 .desired_width(f32::INFINITY),
         );
     }
+
+    fn render_settings(&mut self, ui: &mut egui::Ui) {
+        ui.heading("Settings");
+        ui.label("Manage persistent configuration for the HMIR runtime.");
+        ui.add_space(12.0);
+
+        egui::Grid::new("settings_grid")
+            .num_columns(2)
+            .spacing([40.0, 18.0])
+            .show(ui, |ui| {
+                ui.label("API Port");
+                ui.add(egui::DragValue::new(&mut self.config_state.api_port).clamp_range(1024..=65535));
+                ui.end_row();
+
+                ui.label("Worker Port");
+                ui.add(egui::DragValue::new(&mut self.config_state.worker_port).clamp_range(1024..=65535));
+                ui.end_row();
+
+                ui.label("Telemetry Interval (ms)");
+                ui.add(egui::DragValue::new(&mut self.config_state.telemetry_refresh_ms).clamp_range(100..=10000));
+                ui.end_row();
+
+                ui.label("NPU Priority Mode");
+                ui.checkbox(&mut self.config_state.npu_priority, "Prefer NPU over GPU/CPU");
+                ui.end_row();
+            });
+
+        ui.add_space(24.0);
+        if ui.add(egui::Button::new(egui::RichText::new("SAVE CONFIGURATION").strong().color(egui::Color32::BLACK)).fill(egui::Color32::from_rgb(0, 242, 255))).clicked() {
+            let _ = self.cmd_sender.try_send(DashboardCmd::SaveConfig(self.config_state.clone()));
+        }
+        
+        ui.add_space(32.0);
+        ui.heading("Advanced Visuals");
+        ui.horizontal(|ui| {
+            ui.label("Interface Scale");
+            if ui.button("Small").clicked() { ctx_set_pixels_per_point(ui.ctx(), 1.0); }
+            if ui.button("Default").clicked() { ctx_set_pixels_per_point(ui.ctx(), 1.2); }
+            if ui.button("Large").clicked() { ctx_set_pixels_per_point(ui.ctx(), 1.5); }
+        });
+    }
+
+    fn render_setup_wizard(&mut self, ctx: &egui::Context) {
+        let mut open = true;
+        egui::Window::new("✨ HMIR ELITE | WELCOME")
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+            .fixed_size([500.0, 400.0])
+            .show(ctx, |ui| {
+                ui.add_space(10.0);
+                ui.vertical_centered(|ui| {
+                    ui.label(egui::RichText::new("HMIR").size(32.0).strong().color(egui::Color32::from_rgb(0, 242, 255)));
+                    ui.label("Specialized Heterogeneous Inference Runtime");
+                });
+                ui.add_space(20.0);
+
+                ui.group(|ui| {
+                    ui.heading("Quick Setup");
+                    ui.label("HMIR detected this is your first launch. Let's configure your local environment.");
+                    ui.add_space(10.0);
+                    
+                    ui.label("1. Select your default model architecture:");
+                    egui::ComboBox::from_label("Default Model")
+                        .selected_text(self.config_state.default_model.clone().unwrap_or_else(|| "Select Model".to_string()))
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.config_state.default_model, Some("qwen2.5-1.5b-ov".to_string()), "Qwen 2.5 1.5B (Intel NPU Optimized)");
+                            ui.selectable_value(&mut self.config_state.default_model, Some("llama3.2-1b".to_string()), "Llama 3.2 1B (GPU/CPU)");
+                        });
+                    
+                    ui.add_space(10.0);
+                    ui.label("2. Communication Ports:");
+                    ui.horizontal(|ui| {
+                        ui.label("API:");
+                        ui.add(egui::DragValue::new(&mut self.config_state.api_port).clamp_range(1024..=65535));
+                        ui.separator();
+                        ui.label("Worker:");
+                        ui.add(egui::DragValue::new(&mut self.config_state.worker_port).clamp_range(1024..=65535));
+                    });
+                });
+
+                ui.add_space(20.0);
+                ui.vertical_centered(|ui| {
+                    if ui.add(egui::Button::new(egui::RichText::new("FINALIZE SETUP").strong().color(egui::Color32::BLACK)).fill(egui::Color32::from_rgb(0, 242, 255))).clicked() {
+                        let _ = self.cmd_sender.try_send(DashboardCmd::SaveConfig(self.config_state.clone()));
+                        self.show_setup_wizard = false;
+                    }
+                    if ui.button("Skip for now (use defaults)").clicked() {
+                        self.show_setup_wizard = false;
+                    }
+                });
+            });
+    }
+}
+
+fn ctx_set_pixels_per_point(ctx: &egui::Context, scale: f32) {
+    ctx.set_pixels_per_point(scale);
 }
 
 impl eframe::App for DashboardApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.show_setup_wizard {
+            self.render_setup_wizard(ctx);
+            // We can still process telemetry in background
+        }
+
         while let Ok(event) = self.telemetry_receiver.try_recv() {
             match event {
                 TelemetryEvent::HardwareState {
@@ -720,6 +829,7 @@ impl eframe::App for DashboardApp {
                         (Tab::Chat, " CHAT", "💬"),
                         (Tab::Models, " MODELS", "📦"),
                         (Tab::Logs, " LOGS", "📜"),
+                        (Tab::Settings, " SETTINGS", "⚙"),
                     ] {
                         let is_selected = self.current_tab == tab;
                         let text = egui::RichText::new(format!("{} {}", icon, label))
@@ -784,6 +894,7 @@ impl eframe::App for DashboardApp {
             Tab::Chat => self.render_chat(ui),
             Tab::Models => self.render_models(ui),
             Tab::Logs => self.render_logs(ui),
+            Tab::Settings => self.render_settings(ui),
         });
 
         ctx.request_repaint_after(Duration::from_millis(250));
@@ -1074,6 +1185,11 @@ fn main() -> Result<(), eframe::Error> {
                                 content: "Chat cleared. HMIR is ready for the next local request.".to_string(),
                                 is_error: false,
                             });
+                        }
+                        DashboardCmd::SaveConfig(new_config) => {
+                            if let Err(err) = new_config.save() {
+                                append_dashboard_error(&format!("Failed to save config: {}", err));
+                            }
                         }
                     }
                 }

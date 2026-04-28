@@ -35,8 +35,8 @@ enum Commands {
     #[command(visible_alias = "serve")]
     Start {
         /// The port to listen on for the API
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
+        #[arg(short, long)]
+        port: Option<u16>,
         /// Launch the legacy web dashboard in the browser instead of the native app
         #[arg(short, long)]
         web: bool,
@@ -53,14 +53,14 @@ enum Commands {
     #[command(visible_alias = "ui")]
     Dashboard {
         /// The port to connect to the API on
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
+        #[arg(short, long)]
+        port: Option<u16>,
     },
     /// Show OpenAI-compatible integration settings for editors and local apps
     Integrations {
         /// The API port your HMIR runtime is listening on
-        #[arg(short, long, default_value = "8080")]
-        port: u16,
+        #[arg(short, long)]
+        port: Option<u16>,
         /// Suggested model name to display in the examples
         #[arg(short, long)]
         model: Option<String>,
@@ -82,6 +82,12 @@ enum Commands {
     },
     /// Purge runtime caches (OpenVINO, etc.) to resolve loading errors
     Clean,
+    /// Real-time hardware monitoring (NPU/GPU/CPU)
+    Smi {
+        /// The API port to fetch telemetry from
+        #[arg(short, long)]
+        port: Option<u16>,
+    },
     /// Uninstall HMIR ELITE and purge all runtime data
     Uninstall,
 }
@@ -107,7 +113,9 @@ async fn main() {
             no_browser,
         } => {
             println!("🚀 Launching HMIR ELITE Compute Hub");
-            commands::start::start_daemon(port, web, model, no_browser).await;
+            let config = hmir_core::config::HmirConfig::load();
+            let final_port = port.unwrap_or(config.api_port);
+            commands::start::start_daemon(final_port, web, model, no_browser).await;
         }
         Commands::Stop => {
             stop_all_instances();
@@ -115,10 +123,14 @@ async fn main() {
         }
         Commands::Dashboard { port } => {
             println!("🖥️  Launching HMIR Dashboard...");
-            commands::start::launch_dashboard(port).await;
+            let config = hmir_core::config::HmirConfig::load();
+            let final_port = port.unwrap_or(config.api_port);
+            commands::start::launch_dashboard(final_port).await;
         }
         Commands::Integrations { port, model } => {
-            commands::integrations::print_integrations(port, model.as_deref());
+            let config = hmir_core::config::HmirConfig::load();
+            let final_port = port.unwrap_or(config.api_port);
+            commands::integrations::print_integrations(final_port, model.as_deref());
         }
         Commands::Logs {
             tail,
@@ -130,6 +142,11 @@ async fn main() {
         }
         Commands::Clean => {
             commands::clean::run_clean().await;
+        }
+        Commands::Smi { port } => {
+            let config = hmir_core::config::HmirConfig::load();
+            let final_port = port.unwrap_or(config.api_port);
+            commands::smi::run_smi(final_port).await;
         }
         Commands::Uninstall => {
             println!("🗑️  HMIR ELITE | COMMENCING FULL SYSTEM UNINSTALL");
