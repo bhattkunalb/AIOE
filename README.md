@@ -135,28 +135,30 @@ This will install the `hmir` tool to `~/.local/bin` and configure your PATH.
 
 After installation, use the `hmir` command to manage your runtime.
 
-### 1. Essential Workflow
+### 1. CLI Reference Table
 
 | Command | Description |
 | :--- | :--- |
-| `hmir suggest` | **Start here.** Detects hardware and recommends models. |
-| `hmir pull <name>` | Downloads an optimized model (e.g., `qwen2.5-1.5b-ov`). |
-| `hmir start` | Launches the API and the **Native Dashboard**. |
-| `hmir dashboard` | Launches the native dashboard UI only. |
-| `hmir web` | Opens the legacy browser-based console. |
-| `hmir status` | Checks health, active models, and port status. |
-| `hmir smi` | Real-time **System Management Interface** (NPU/GPU/CPU). |
-| `hmir stop` | Gracefully stops all background workers and APIs. |
+| `hmir suggest` | **Hardware Intelligence.** Detects your silicon and recommends models. |
+| `hmir pull <name>` | Downloads an optimized model package (e.g., `qwen2.5-1.5b-ov`). |
+| `hmir start` | Launches the local Inference API and the **Native Dashboard**. |
+| `hmir dashboard` | Launches the native desktop dashboard only. (Alias: `ui`) |
+| `hmir web` | Opens the legacy browser-based console in your default browser. |
+| `hmir status` | Checks the health of the runtime, active models, and port availability. |
+| `hmir smi` | **System Management Interface.** Real-time NPU/GPU/CPU monitoring. |
+| `hmir integrations` | Prints OpenAI-compatible settings for Cursor, VS Code, and SDKs. |
+| `hmir logs` | Inspects local runtime logs. Use `--follow` for a live stream. |
+| `hmir clean` | Purges hardware acceleration caches to resolve loading errors. |
+| `hmir stop` | Gracefully terminates all background workers and active APIs. |
+| `hmir uninstall` | **Deep Purge.** Removes all HMIR binaries, models, and runtime data. |
 
-### 2. Advanced Usage
+### 2. Advanced Usage & Flags
 
-- **Start with a specific model**: `hmir start --model llama3.2-3b`
-- **Headless Mode**: `hmir start --headless` (API only, no UI).
-- **Web Console**: `hmir start --web` (Launches the legacy browser UI).
-- **Integration Help**: `hmir integrations` (Settings for Cursor/VS Code).
-- **Log Inspection**: `hmir logs --tail 100 --follow`
-- **System Reset**: `hmir clean` (Purges hardware caches if things get stuck).
-- **Full Uninstall**: `hmir uninstall` (Purges all data and binaries).
+- **Headless Mode**: `hmir start --headless` (Starts the API only).
+- **Custom Port**: `hmir start --port 9000` (Default is `8080`).
+- **Start with Model**: `hmir start --model llama3.2-3b` (Auto-loads on boot).
+- **Log Filtering**: `hmir logs --tail 200 --grep ERROR`
+- **Source Build**: `cargo run --release -p hmir-cli -- start`
 
 ## How It Works
 
