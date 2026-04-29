@@ -15,6 +15,12 @@ import shutil
 from aiohttp import web  # pylint: disable=import-error
 from openvino_genai import LLMPipeline  # pylint: disable=import-error
 
+# Force UTF-8 encoding for Windows terminals to prevent UnicodeEncodeError
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 # Configuration
 DEFAULT_PORT = 8089
 
@@ -242,8 +248,8 @@ def main():
     model_arg = args.model or os.environ.get("HMIR_MODEL_PATH", "qwen2.5-1.5b-ov")
     init_pipeline(model_arg)
 
-    print(f"[NPU-SERVICE] Starting HTTP server on port {port}", flush=True)
-    web.run_app(app, host="0.0.0.0", port=port, access_log=None)
+    print(f"[NPU-SERVICE] Starting HTTP server on 127.0.0.1:{port}", flush=True)
+    web.run_app(app, host="127.0.0.1", port=port, access_log=None)
 
 if __name__ == "__main__":
     main()

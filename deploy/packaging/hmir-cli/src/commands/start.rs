@@ -40,25 +40,8 @@ pub async fn start_daemon(port: u16, web: bool, model: Option<String>, no_browse
     } else {
         println!("✅ [FREE]");
 
-        // 1. Start NPU Execution Bridge (Python)
-        print!("⚙️ Activating hardware bridge... ");
-        if let Some(bridge_path) = resolve_script_path(&bin_dir, "hmir_npu_service.py") {
-            let bridge_proc = Command::new(resolve_python_command(&bin_dir))
-                .arg(&bridge_path)
-                .stdout(std::process::Stdio::null())
-                .stderr(std::process::Stdio::null())
-                .spawn();
-
-            match bridge_proc {
-                Ok(_) => println!("✅ [OK]"),
-                Err(e) => println!(
-                    "⚠️ [WARN] Failed to spawn bridge: {}. HMIR will still try GPU/CPU paths.",
-                    e
-                ),
-            }
-        } else {
-            println!("⚠️ [WARN] No bridge script found. Continuing without Python bridge.");
-        }
+        // 1. Hardware Bridge (managed by API)
+        println!("⚙️  Hardware bridge will be managed by HMIR API.");
 
         // 2. Start HMIR API Server
         print!("🔌 Starting Inference API (port {})... ", port);
@@ -163,43 +146,4 @@ fn current_bin_dir() -> PathBuf {
 
 fn executable_name(base: &str) -> String {
     format!("{}{}", base, std::env::consts::EXE_SUFFIX)
-}
-
-fn resolve_script_path(bin_dir: &Path, script_name: &str) -> Option<PathBuf> {
-    let candidates = [
-        bin_dir.join("scripts").join(script_name),
-        std::env::current_dir()
-            .unwrap_or_default()
-            .join("scripts")
-            .join(script_name),
-    ];
-
-    candidates.into_iter().find(|path| path.exists())
-}
-
-fn resolve_python_command(bin_dir: &Path) -> String {
-    let candidates = [
-        std::env::current_dir()
-            .unwrap_or_default()
-            .join(".venv")
-            .join("Scripts")
-            .join("python.exe"),
-        std::env::current_dir()
-            .unwrap_or_default()
-            .join(".venv")
-            .join("bin")
-            .join("python"),
-        bin_dir.join(".venv").join("Scripts").join("python.exe"),
-        bin_dir.join(".venv").join("bin").join("python"),
-    ];
-
-    if let Some(path) = candidates.into_iter().find(|path| path.exists()) {
-        return path.to_string_lossy().to_string();
-    }
-
-    if cfg!(target_os = "windows") {
-        "python".to_string()
-    } else {
-        "python3".to_string()
-    }
 }

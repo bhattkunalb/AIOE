@@ -68,18 +68,22 @@ fn models_dir() -> PathBuf {
 }
 
 fn resolve_script_path(script_name: &str) -> PathBuf {
-    let candidates = [
+    let mut candidates = vec![
         std::env::current_dir()
             .unwrap_or_default()
             .join("scripts")
             .join(script_name),
-        std::env::current_exe()
-            .unwrap_or_default()
-            .parent()
-            .unwrap_or_else(|| std::path::Path::new("."))
-            .join("scripts")
-            .join(script_name),
     ];
+
+    if let Ok(mut exe_dir) = std::env::current_exe() {
+        exe_dir.pop();
+        candidates.push(exe_dir.join("scripts").join(script_name));
+    }
+
+    // Also check for the script directly in the parent directory if we are in target/debug
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join(script_name));
+    }
 
     candidates
         .into_iter()
@@ -142,39 +146,64 @@ fn log_event(msg: &str) {
 
 pub async fn list_installed_models(State(state): State<AppState>) -> Json<serde_json::Value> {
     let mut models = Vec::new();
-    let path = models_dir();
+    let mut seen = std::collections::HashSet::new();
     let active_now = state.active_model.lock().unwrap().clone();
 
-    if let Ok(entries) = std::fs::read_dir(&path) {
-        for entry in entries.flatten() {
-            let mut name = None;
-            let mut is_dir = false;
-            if entry.path().is_dir() {
-                name = entry.file_name().to_str().map(|s| s.to_string());
-                is_dir = true;
-            } else if let Some(ext) = entry.path().extension().and_then(|e| e.to_str()) {
-                let ext_l = ext.to_lowercase();
-                if ext_l == "gguf" || ext_l == "ov" || ext_l == "bin" {
+    // Paths to search for models
+    let mut search_paths = vec![models_dir()];
+    if let Ok(cwd) = std::env::current_dir() {
+        search_paths.push(cwd.join("model")); // Project root 'model' dir
+        search_paths.push(cwd.clone());       // Current dir for loose models
+    }
+
+    for path in search_paths {
+        if let Ok(entries) = std::fs::read_dir(&path) {
+            for entry in entries.flatten() {
+                let mut name = None;
+                let mut is_dir = false;
+                let entry_path = entry.path();
+                
+                if entry_path.is_dir() {
                     name = entry.file_name().to_str().map(|s| s.to_string());
+                    is_dir = true;
+                } else if let Some(ext) = entry_path.extension().and_then(|e| e.to_str()) {
+                    let ext_l = ext.to_lowercase();
+                    if ext_l == "gguf" || ext_l == "ov" || ext_l == "bin" {
+                        name = entry.file_name().to_str().map(|s| s.to_string());
+                    }
                 }
-            }
 
-            if let Some(n) = name {
-                let is_active = n == active_now;
-                let size_str = if is_dir {
-                    "Folder".to_string()
-                } else {
-                    format!(
-                        "{:.1} GB",
-                        (entry.metadata().map(|m| m.len()).unwrap_or(0) as f64) / 1_073_741_824.0
-                    )
-                };
+                if let Some(n) = name {
+                    // Filter: Only include valid model directories or specific files
+                    // For directories, check if they look like a model (contain config.json or openvino_model.xml)
+                    if is_dir {
+                        let is_valid = entry_path.join("config.json").exists() 
+                                    || entry_path.join("openvino_model.xml").exists()
+                                    || n.to_lowercase().contains("-ov")
+                                    || n.to_lowercase().contains("-gguf");
+                        if !is_valid { continue; }
+                    }
 
-                models.push(serde_json::json!({
-                    "name": n,
-                    "active": is_active,
-                    "size": size_str
-                }));
+                    if seen.contains(&n) { continue; }
+                    seen.insert(n.clone());
+
+                    let is_active = n == active_now;
+                    let size_str = if is_dir {
+                        "Folder".to_string()
+                    } else {
+                        format!(
+                            "{:.1} GB",
+                            (entry.metadata().map(|m| m.len()).unwrap_or(0) as f64) / 1_073_741_824.0
+                        )
+                    };
+
+                    models.push(serde_json::json!({
+                        "name": n,
+                        "active": is_active,
+                        "size": size_str,
+                        "path": entry_path.to_string_lossy()
+                    }));
+                }
             }
         }
     }
@@ -579,6 +608,16 @@ async fn main() {
 
     // -- Auto-spawn NPU Worker --
     log_event(&format!("[BOOT] Launching NPU Inference Worker (port {})...", config.worker_port));
+    
+    // Cleanup port 8089 before starting to avoid 10048 errors
+    if cfg!(target_os = "windows") {
+        log_event("  [BOOT] Cleaning up port 8089...");
+        let _ = std::process::Command::new("powershell")
+            .args(["-Command", &format!("Get-NetTCPConnection -LocalPort {} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}", config.worker_port)])
+            .output();
+        std::thread::sleep(std::time::Duration::from_millis(500));
+    }
+
     let worker_script = resolve_script_path("hmir_npu_service.py");
 
     // Resolve the project root for setting working directory on spawned processes
@@ -618,7 +657,8 @@ async fn main() {
             .spawn()
         {
             Ok(mut child) => {
-                log_event(&format!("  NPU Worker spawned (PID: {})", child.id()));
+                let worker_pid = child.id();
+                log_event(&format!("  NPU Worker spawned (PID: {})", worker_pid));
                 // Stream worker stdout/stderr into our log bus
                 let child_stderr = child.stderr.take();
                 let child_stdout = child.stdout.take();
@@ -644,13 +684,13 @@ async fn main() {
                 });
 
                 // Wait for worker to come online (up to 90s for NPU compilation)
-                log_event("  Waiting for NPU Worker to bind on :8089 (may take 60-90s for NPU model compilation)...");
+                log_event(&format!("  Waiting for NPU Worker to bind on :{} (may take 60-90s)...", config.worker_port));
                 let client = reqwest::Client::new();
                 let mut worker_online = false;
                 for attempt in 1..=45 {
                     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
                     if let Ok(resp) = client
-                        .get("http://127.0.0.1:8089/health")
+                        .get(format!("http://127.0.0.1:{}/health", config.worker_port))
                         .timeout(std::time::Duration::from_secs(2))
                         .send()
                         .await
@@ -678,32 +718,43 @@ async fn main() {
                 let worker_script_watch = worker_script.clone();
                 let project_root_watch = project_root.clone();
                 let model_path_watch = model_path.clone();
+                let worker_port_watch = config.worker_port;
                 tokio::spawn(async move {
                     let client = reqwest::Client::new();
                     loop {
                         tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-                        match client
-                            .get("http://127.0.0.1:8089/health")
+                        let health_check = client
+                            .get(format!("http://127.0.0.1:{}/health", worker_port_watch))
                             .timeout(std::time::Duration::from_secs(5))
                             .send()
-                            .await
-                        {
+                            .await;
+
+                        match health_check {
                             Ok(resp) if resp.status().is_success() => {
                                 // Worker is healthy
                             }
                             _ => {
-                                log_event("⚠️ [WATCHDOG] NPU Worker unresponsive. Attempting RESTART...");
-                                // Try to spawn again
+                                log_event("⚠️ [WATCHDOG] NPU Worker unresponsive. Attempting RECOVERY...");
+                                
+                                // 1. Kill any existing process on the port
+                                if cfg!(target_os = "windows") {
+                                    let _ = std::process::Command::new("powershell")
+                                        .args(["-Command", &format!("Get-NetTCPConnection -LocalPort {} -ErrorAction SilentlyContinue | ForEach-Object {{ Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }}", worker_port_watch)])
+                                        .output();
+                                }
+
+                                // 2. Restart
                                 let _ = std::process::Command::new(&python_bin_watch)
                                     .arg("-u")
                                     .arg(&worker_script_watch)
+                                    .arg("--port")
+                                    .arg(worker_port_watch.to_string())
                                     .current_dir(&project_root_watch)
                                     .env("HMIR_MODEL_PATH", &model_path_watch)
                                     .stdout(Stdio::inherit())
                                     .stderr(Stdio::inherit())
                                     .spawn();
                                 
-                                // Wait a bit for it to come up
                                 tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
                             }
                         }
