@@ -69,7 +69,13 @@
     "CoreML",
     "LUID",
     "LUIDs",
-    "engtype"
+    "engtype",
+    "AMDGPU",
+    "TensorRT",
+    "TRT",
+    "ANE",
+    "MLX",
+    "ivpu"
   ],
   "ignorePaths": [
     "target",

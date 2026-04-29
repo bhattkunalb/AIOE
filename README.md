@@ -99,6 +99,16 @@ graph TD
     LCPP --> CPU[CPU Fallback]
 ```
 
+### 🌉 Supported Execution Backends
+
+| Backend | Primary Hardware | Acceleration Technology |
+| :--- | :--- | :--- |
+| **OpenVINO** | Intel NPU/GPU/CPU | Intel OpenVINO GenAI |
+| **MLX** | Apple Silicon (M1/M2/M3) | Metal / Apple Neural Engine |
+| **TensorRT** | NVIDIA RTX GPUs | CUDA / TensorRT Engines |
+| **ROCm** | AMD Radeon/Instinct | ROCm / MIGraphX |
+| **llama.cpp** | CPU Fallback / General | GGUF / SIMD Optimized |
+
 ## 🛠️ Self-Healing & Maintenance
 
 HMIR is designed for **Zero-Touch Maintenance**. It includes several self-healing mechanisms to ensure high availability:
@@ -167,6 +177,7 @@ After installation, use the `hmir` command to manage your runtime.
 - **Headless Mode**: `hmir start --headless` (Starts the API only).
 - **Custom Port**: `hmir start --port 9000` (Default is `8080`).
 - **Start with Model**: `hmir start --model llama3.2-3b` (Auto-loads on boot).
+- **Force Backend**: `hmir start --backend mlx` (Options: `ov`, `mlx`, `trt`, `rocm`, `llama`).
 - **Log Filtering**: `hmir logs --tail 200 --grep ERROR`
 - **Source Build**: `cargo run --release -p hmir-cli -- start`
 

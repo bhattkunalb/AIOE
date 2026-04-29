@@ -49,6 +49,9 @@ enum Commands {
         /// The model to load on startup
         #[arg(short, long)]
         model: Option<String>,
+        /// Explicitly select an execution backend (ov, mlx, trt, rocm, llama)
+        #[arg(short, long)]
+        backend: Option<String>,
         /// Do not launch any UI (native dashboard or browser)
         #[arg(long, visible_alias = "headless")]
         no_browser: bool,
@@ -128,12 +131,13 @@ async fn main() {
             port,
             web,
             model,
+            backend,
             no_browser,
         } => {
             println!("🚀 Launching HMIR ELITE Compute Hub");
             let config = hmir_core::config::HmirConfig::load();
             let final_port = port.unwrap_or(config.api_port);
-            commands::start::start_daemon(final_port, web, model, no_browser).await;
+            commands::start::start_daemon(final_port, web, model, backend, no_browser).await;
         }
         Commands::Stop => {
             stop_all_instances();

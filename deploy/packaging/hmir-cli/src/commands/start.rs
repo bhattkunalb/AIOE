@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::process::Command;
 
-pub async fn start_daemon(port: u16, web: bool, model: Option<String>, no_browser: bool) {
+pub async fn start_daemon(port: u16, web: bool, model: Option<String>, backend: Option<String>, no_browser: bool) {
     let bin_dir = current_bin_dir();
     let client = reqwest::Client::new();
     let unified_url = format!("http://127.0.0.1:{}", port);
@@ -16,7 +16,7 @@ pub async fn start_daemon(port: u16, web: bool, model: Option<String>, no_browse
     let is_busy = std::net::TcpStream::connect(format!("127.0.0.1:{}", port)).is_ok();
 
     if is_busy {
-        // Check if it's our own HMIR node
+        // ... (existing code for attaching to existing instance)
         if let Ok(res) = client
             .get(format!("{}/v1/health", unified_url))
             .timeout(Duration::from_secs(2))
@@ -50,6 +50,9 @@ pub async fn start_daemon(port: u16, web: bool, model: Option<String>, no_browse
         api_cmd.env("HMIR_PORT", port.to_string());
         if let Some(m) = model {
             api_cmd.env("HMIR_DEFAULT_MODEL", m);
+        }
+        if let Some(b) = backend {
+            api_cmd.env("HMIR_BACKEND", b);
         }
 
         #[cfg(windows)]
