@@ -11,7 +11,7 @@ We currently support the following versions of HMIR with security updates:
 
 ## Reporting a Vulnerability
 
-We take the security of HMIR Elite seriously. If you believe you have found a security vulnerability, please report it to us by emailing [security@hmirlabs.dev](mailto:security@hmirlabs.dev).
+We take the security of HMIR Elite seriously. If you believe you have found a security vulnerability, please report it via the GitHub Private Vulnerability Reporting feature in this repository.
 
 **Please do not report security vulnerabilities via public GitHub issues.**
 

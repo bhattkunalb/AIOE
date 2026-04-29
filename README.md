@@ -65,9 +65,10 @@ To get the best performance, use models optimized for your specific silicon:
 
 HMIR is structured as a multi-tier orchestration layer, ensuring that high-level API logic remains decoupled from low-level hardware drivers.
 
-1. **The Orchestrator (`hmir-core`)**: Handles telemetry aggregation, NPU-first scheduling, and model lifecycle management.
-2. **The Execution Bridges (`hmir-sys`)**: Lean, specialized worker processes that wrap vendor SDKs (OpenVINO, llama.cpp, etc.).
-3. **The Control Plane (`hmir-cli` & `hmir-dashboard`)**: Provides high-fidelity monitoring and persistent configuration management.
+1. **The Orchestrator (`hmir-core`)**: The central engine for hardware-aware scheduling, telemetry aggregation, and model lifecycle management.
+2. **The Gateway (`hmir-api`)**: Provides the OpenAI-compatible REST/SSE interface and cross-platform health monitoring.
+3. **The Bridges (`hmir-sys` & Backend Helpers)**: Lean, specialized worker processes and FFI layers that wrap vendor SDKs (OpenVINO, llama.cpp, etc.).
+4. **The Control Plane (`hmir-cli` & `hmir-dashboard`)**: High-fidelity CLI and desktop UI for real-time monitoring and configuration.
 
 ```mermaid
 graph TD

@@ -20,7 +20,6 @@ version = "1.0.0"
 edition = "2021"
 rust-version = "1.75"
 license = "MIT"
-authors = ["Kunal Bhatt"]
 homepage = "https://github.com/bhattkunalb/HMIR"
 repository = "https://github.com/bhattkunalb/HMIR"
 documentation = "https://github.com/bhattkunalb/HMIR#readme"

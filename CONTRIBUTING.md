@@ -419,7 +419,7 @@ git push origin v1.1.0
 - **Bug reports**: Use GitHub Issues with `bug` label + `hmir logs --level debug` output
 - **Feature requests**: Use GitHub Issues with `enhancement` label + use case description
 - **Questions**: Start a GitHub Discussion or join our community chat
-- **Security issues**: Email <security@hmirlabs.dev> (do not publicize until patched)
+- **Security issues**: Report via GitHub Private Vulnerability Reporting (do not publicize until patched)
 
 ---
 
