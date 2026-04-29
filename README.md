@@ -152,6 +152,9 @@ After installation, use the `hmir` command to manage your runtime.
 | `hmir stop` | Gracefully terminates all background workers and active APIs. |
 | `hmir uninstall` | **Deep Purge.** Removes all HMIR binaries, models, and runtime data. |
 
+> [!TIP]
+> **Self-Documenting CLI**: You can run `hmir --help` at any time to see the full list of commands. For detailed information and available flags for a specific command, use `hmir <command> --help` (e.g., `hmir start --help`).
+
 ### 2. Advanced Usage & Flags
 
 - **Headless Mode**: `hmir start --headless` (Starts the API only).
