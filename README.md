@@ -75,21 +75,28 @@ graph TD
     User([User / SDK / CLI]) --> API[HMIR API Layer]
     Browser([Web Console]) --> API
     Dashboard([Native Dashboard]) --> API
-    subgraph Core ["HMIR ELITE CORE (Rust)"]
+
+    subgraph Core ["HMIR CORE (Orchestrator)"]
         API --> Sched[NPU-First Scheduler]
         Sched --> MM[Model Manager]
         Sched --> Det[Hardware Detector]
         MM --> Engine[Execution Engine]
         Det --> Engine
     end
-    subgraph Backends ["ACCELERATION LAYER"]
+
+    subgraph Backends ["EXECUTION BACKENDS (Pluggable)"]
         Engine --> OV[OpenVINO Bridge]
+        Engine --> MLX[CoreML / MLX Bridge]
+        Engine --> TRT[TensorRT / CUDA Bridge]
+        Engine --> ROCm[ROCm / MIGraphX Bridge]
         Engine --> LCPP[llama.cpp Bridge]
-        OV --> NPU[Intel NPU / AI Boost]
-        OV --> iGPU[Intel UHD/Iris GPU]
-        LCPP --> dGPU[Discrete GPU / CUDA]
-        LCPP --> CPU[System CPU]
     end
+
+    OV --> IntelNPU[Intel NPU]
+    MLX --> AppleNPU[Apple Neural Engine]
+    TRT --> NvidiaGPU[NVIDIA GPU]
+    ROCm --> AMDGPU[AMD GPU]
+    LCPP --> CPU[CPU Fallback]
 ```
 
 ## 🛠️ Self-Healing & Maintenance

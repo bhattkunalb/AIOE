@@ -58,6 +58,35 @@ Core value proposition:
 
 ### Architecture Diagram
 
+```mermaid
+graph TD
+    User([User / SDK / CLI]) --> API[HMIR API Layer]
+    Browser([Web Console]) --> API
+    Dashboard([Native Dashboard]) --> API
+
+    subgraph Core ["HMIR CORE (Orchestrator)"]
+        API --> Sched[NPU-First Scheduler]
+        Sched --> MM[Model Manager]
+        Sched --> Det[Hardware Detector]
+        MM --> Engine[Execution Engine]
+        Det --> Engine
+    end
+
+    subgraph Backends ["EXECUTION BACKENDS (Pluggable)"]
+        Engine --> OV[OpenVINO Bridge]
+        Engine --> MLX[CoreML / MLX Bridge]
+        Engine --> TRT[TensorRT / CUDA Bridge]
+        Engine --> ROCm[ROCm / MIGraphX Bridge]
+        Engine --> LCPP[llama.cpp Bridge]
+    end
+
+    OV --> IntelNPU[Intel NPU]
+    MLX --> AppleNPU[Apple Neural Engine]
+    TRT --> NvidiaGPU[NVIDIA GPU]
+    ROCm --> AMDGPU[AMD GPU]
+    LCPP --> CPU[CPU Fallback]
+```
+
 ```text
                          +---------------------------+
                          |  CLI / SDK / OpenAI App   |
@@ -71,7 +100,7 @@ Core value proposition:
                                        |
                                        v
                          +---------------------------+
-                         |         Scheduler         |
+                         |   HMIR CORE (Orchestrator)|
                          |  route, queue, batch,     |
                          |  fallback, load-balance   |
                          +------+------+-------------+
@@ -97,9 +126,9 @@ Core value proposition:
         |                                                       |
         v                                                       v
 +---------------------------+                     +---------------------------+
-| OpenVINO Backend          |                     | llama.cpp Backend         |
-| Intel NPU / GPU / CPU     |                     | CPU / CUDA / Vulkan /     |
-| OpenVINO IR model packs   |                     | Metal / ROCm-ready GGUF   |
+| EXECUTION BACKENDS        |                     | EXECUTION BACKENDS        |
+| (Pluggable)               |                     | (Pluggable)               |
+| Intel NPU / GPU / CPU     |                     | NVIDIA / AMD / Apple / CPU|
 +---------------------------+                     +---------------------------+
         |                                                       |
         v                                                       v
