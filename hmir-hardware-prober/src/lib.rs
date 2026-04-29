@@ -5,6 +5,12 @@ use std::time::Duration;
 use hmir_core::telemetry::{TelemetryEvent, TelemetrySink};
 use tokio::sync::RwLock;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct HardwareState {
     pub cpu_name: String,
@@ -73,6 +79,7 @@ pub mod os_polling {
         if cpu_temp == 0.0 {
             if let Ok(output) = std::process::Command::new("powershell")
                 .args(["-Command", "Get-CimInstance Win32_PerfRawData_Counters_ThermalZoneInformation | Select-Object -ExpandProperty HighPrecisionTemperature -First 1"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
             {
                 let raw = String::from_utf8_lossy(&output.stdout).trim().parse::<f64>().unwrap_or(0.0);
@@ -123,6 +130,7 @@ pub mod os_polling {
 
         if let Ok(output) = std::process::Command::new("powershell")
             .args(["-Command", "$p=Get-CimInstance Win32_Processor | Select-Object -First 1; $v=Get-CimInstance Win32_VideoController | Select-Object -First 1; $d=Get-CimInstance Win32_DiskDrive | Select-Object -First 1; $m=Get-CimInstance Win32_PhysicalMemory | Select-Object -First 1; @{cores=$p.NumberOfCores; logical=$p.NumberOfLogicalProcessors; l3=$p.L3CacheSize; g_driver=$v.DriverVersion; d_model=$d.Model; m_speed=$m.Speed} | ConvertTo-Json"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&String::from_utf8_lossy(&output.stdout)) {
@@ -139,6 +147,7 @@ pub mod os_polling {
         if npu_active {
             if let Ok(output) = std::process::Command::new("powershell")
                 .args(["-Command", "Get-WmiObject Win32_PnPSignedDriver | Where-Object { $_.DeviceName -match 'NPU|AI Boost' } | Select-Object -ExpandProperty DriverVersion -First 1"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
              {
                  let ver = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -148,6 +157,7 @@ pub mod os_polling {
 
         let gpu_util = if let Ok(output) = std::process::Command::new("powershell")
             .args(["-Command", "Get-CimInstance Win32_PerfFormattedData_GPUPerformanceCounters_GPUEngine | Where-Object { $_.Name -match '3D|Graphics' } | Measure-Object -Property UtilizationPercentage -Average | Select-Object -ExpandProperty Average"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
             String::from_utf8_lossy(&output.stdout).trim().replace(',', ".").parse::<f64>().unwrap_or(0.0)
@@ -160,6 +170,7 @@ pub mod os_polling {
             if let Ok(output) = std::process::Command::new("powershell")
                 .args(["-NoProfile", "-Command",
                     "try { $c = Get-CimInstance Win32_PerfFormattedData_NeuralProcessorPerformanceCounters_NPUEngine -ErrorAction Stop; ($c | Measure-Object -Property UtilizationPercentage -Average).Average } catch { 'NOTFOUND' }"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
             {
                 let raw = String::from_utf8_lossy(&output.stdout).trim().replace(',', ".");
@@ -173,6 +184,7 @@ pub mod os_polling {
                 if let Ok(output) = std::process::Command::new("powershell")
                     .args(["-NoProfile", "-Command",
                         "try { $v = (Get-Counter '\\NPU(*)\\Utilization Percentage' -ErrorAction Stop).CounterSamples | Measure-Object -Property CookedValue -Average; $v.Average } catch { '0' }"])
+                    .creation_flags(CREATE_NO_WINDOW)
                     .output()
                 {
                     let raw = String::from_utf8_lossy(&output.stdout).trim().replace(',', ".");
@@ -185,6 +197,7 @@ pub mod os_polling {
                 if let Ok(output) = std::process::Command::new("powershell")
                     .args(["-NoProfile", "-Command",
                         "try { $r = Invoke-RestMethod -Uri 'http://127.0.0.1:8089/health' -TimeoutSec 1; if ($r.status -eq 'GENERATING') { '95' } elseif ($r.status -eq 'READY') { '1' } else { '0' } } catch { '0' }"])
+                    .creation_flags(CREATE_NO_WINDOW)
                     .output()
                 {
                     let raw_str = String::from_utf8_lossy(&output.stdout);
@@ -215,6 +228,7 @@ pub mod os_polling {
 
         let (ded_gpu, shr_gpu) = if let Ok(output) = std::process::Command::new("powershell")
             .args(["-Command", "Get-CimInstance Win32_VideoController | Select-Object -Property DedicatedVideoMemory, SharedSystemMemory -First 1 | ConvertTo-Json"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
             if let Ok(json) = serde_json::from_str::<serde_json::Value>(&String::from_utf8_lossy(&output.stdout)) {
@@ -298,6 +312,7 @@ pub mod os_polling {
         // Check for ComputeAccelerator class (Intel AI Boost, Qualcomm)
         if let Ok(output) = std::process::Command::new("powershell")
             .args(["-Command", "Get-PnpDevice -Class 'ComputeAccelerator' -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FriendlyName"])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
             let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -310,6 +325,7 @@ pub mod os_polling {
         if npu == "None" {
             if let Ok(output) = std::process::Command::new("powershell")
                 .args(["-Command", "Get-CimInstance Win32_PnPEntity | Where-Object { $_.Name -match 'NPU|Neural|AI Boost|Hexagon' } | Select-Object -ExpandProperty Name -First 1"])
+                .creation_flags(CREATE_NO_WINDOW)
                 .output()
             {
                 let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
@@ -325,6 +341,7 @@ pub mod os_polling {
                 "-Command",
                 "Get-CimInstance Win32_VideoController | Select-Object -ExpandProperty Name",
             ])
+            .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
             let name = String::from_utf8_lossy(&output.stdout).trim().to_string();

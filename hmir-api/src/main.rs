@@ -30,6 +30,12 @@ lazy_static::lazy_static! {
 use std::process::Stdio;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ModelInfo {
     pub name: String,
@@ -151,6 +157,20 @@ pub async fn list_installed_models(State(state): State<AppState>) -> Json<serde_
 
     // Paths to search for models
     let mut search_paths = vec![models_dir()];
+    
+    // Add ~/.hmir/models (plural) - Harmonize with installer
+    if let Ok(home) = std::env::var("USERPROFILE") {
+        let mut home_models = PathBuf::from(home);
+        home_models.push(".hmir");
+        home_models.push("models");
+        search_paths.push(home_models);
+    }
+
+    // Add AppData models
+    let mut models_plural = data_root();
+    models_plural.push("models");
+    search_paths.push(models_plural);
+
     // Add ~/.hmir/model (singular) as well
     let mut model_singular = data_root();
     model_singular.push("model");
@@ -331,13 +351,17 @@ pub async fn download_model(
         let script_path = resolve_script_path("download_npu_model.py");
         let python_bin = resolve_python_command();
 
-        let child_res = tokio::process::Command::new(python_bin)
-            .arg(script_path)
+        let mut cmd = tokio::process::Command::new(python_bin);
+        cmd.arg(script_path)
             .arg(&repo)
             .arg(&folder)
             .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn();
+            .stderr(Stdio::piped());
+
+        #[cfg(target_os = "windows")]
+        cmd.creation_flags(CREATE_NO_WINDOW);
+
+        let child_res = cmd.spawn();
         match child_res {
             Ok(mut child) => {
                 let stdout = child.stdout.take();
@@ -642,7 +666,12 @@ async fn main() {
     let worker_script = resolve_script_path("hmir_npu_service.py");
 
     // Resolve the project root for setting working directory on spawned processes
-    let project_root = std::env::current_dir().unwrap_or_default();
+    // Use worker_script's grandparent (installation root) if it exists, otherwise fallback to data_root()
+    let project_root = if worker_script.exists() {
+        worker_script.parent().and_then(|p| p.parent()).map(|p| p.to_path_buf()).unwrap_or_else(data_root)
+    } else {
+        data_root()
+    };
 
     // Resolve model path to absolute path in LOCALAPPDATA
     let model_path = {
@@ -665,9 +694,6 @@ async fn main() {
         log_event(&format!("  Using Python runtime: {}", python_bin));
         log_event(&format!("  Worker script: {}", worker_script.display()));
         log_event(&format!("  Working directory: {}", project_root.display()));
-
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
 
         match std::process::Command::new(&python_bin)
             .arg("-u")
@@ -774,9 +800,6 @@ async fn main() {
 
                                 // 2. Restart
                                 {
-                                    use std::os::windows::process::CommandExt;
-                                    const CREATE_NO_WINDOW: u32 = 0x08000000;
-
                                     let _ = std::process::Command::new(&python_bin_watch)
                                         .arg("-u")
                                         .arg(&worker_script_watch)
