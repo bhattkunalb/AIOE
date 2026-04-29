@@ -1,3 +1,4 @@
+// cSpell:ignore USERPROFILE, pids
 use axum::{
     extract::State,
     response::{

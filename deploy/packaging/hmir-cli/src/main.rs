@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-// cSpell:ignore USERPROFILE, WINDOWTITLE
+// cSpell:ignore USERPROFILE, WINDOWTITLE, pids
 mod commands;
 
 const LONG_ABOUT: &str = "HMIR is a local heterogeneous inference runtime.\n\nIt exposes one OpenAI-compatible local API across NPU, GPU, and CPU so local apps and editors can use the same endpoint without manual device juggling.";
