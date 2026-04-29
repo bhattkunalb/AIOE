@@ -9,7 +9,7 @@ use axum::{
 };
 use futures::stream::Stream;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::fs::OpenOptions;
 use std::io::Write;
