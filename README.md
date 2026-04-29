@@ -2,9 +2,23 @@
 
 ![HMIR Banner](assets/hmir_elite_banner.png)
 
-> **The Universal Local Inference Engine for the AI PC Era.**
+> **Your hardware is smarter than your software. HMIR makes them match.**
 >
-> HMIR (Heterogeneous Model Inference Runtime) is a unified, production-grade inference platform designed to orchestrate Large Language Models across **NPU, GPU, and CPU**. With an **NPU-first** scheduling philosophy, HMIR maximizes battery life and system responsiveness while providing transparent, high-performance fallback to discrete or integrated graphics.
+> NPUs entered consumer hardware in 2017, but software never caught up. **HMIR is that missing layer.**
+>
+> A silicon-aware inference runtime that intelligently orchestrates AI workloads across **NPU, GPU, and CPU**—prioritizing NPUs for maximum efficiency, with seamless fallback when needed.
+
+---
+
+## 🚀 The Vision
+
+Run Local LLMs the way modern hardware was meant to:
+
+- **🧠 NPU-First Execution**: Low-power, always-on inference for Intel AI Boost, Apple Neural Engine, and more.
+- **⚡ Dynamic Routing**: Silicon-aware scheduling across heterogeneous compute targets.
+- **🌐 Universal Stack**: Cross-platform support across all major hardware vendors (Intel, NVIDIA, Apple, AMD, Qualcomm).
+
+**Any model. Any hardware. Fully optimized.**
 
 ---
 
@@ -12,11 +26,10 @@
 
 Local LLM deployment is often a trade-off between performance and efficiency. HMIR eliminates this friction by providing a **single, hardware-aware abstraction layer** that handles the complexities of modern silicon.
 
-- **🚀 NPU-First Execution**: Automatically targets Intel AI Boost (NPU) and Apple Neural Engine (ANE) for ultra-low power background inference.
-- **🛡️ Intelligent Fallback**: If the primary accelerator is overloaded or incompatible, HMIR seamlessly spills over to the GPU or CPU.
-- **🔌 OpenAI Compatible**: A drop-in replacement for any application using the OpenAI SDK. Use your favorite tools (Cursor, Open WebUI, etc.) with local silicon.
-- **📊 Unified Telemetry**: Real-time visibility into NPU, GPU, and CPU utilization through the `hmir smi` tool and native dashboards.
-- **⚡ Self-Healing Runtime**: Automatic recovery from port conflicts, stale hardware caches, and corrupt model weights.
+- **🔌 OpenAI Compatible**: A drop-in replacement for any application using the OpenAI SDK (Cursor, Open WebUI, etc.).
+- **📊 Unified Telemetry**: Real-time visibility into NPU, GPU, and CPU utilization via `hmir smi`.
+- **🛡️ Self-Healing Runtime**: Automatic recovery from port conflicts, stale hardware caches, and corrupt weights.
+- **🤫 Silent Operations**: Optimized for Windows with zero-window execution for all background workers.
 - **🤫 Silent Background Mode**: Optimized for Windows with zero-window execution (no PowerShell flickers) for all background workers.
 
 ---

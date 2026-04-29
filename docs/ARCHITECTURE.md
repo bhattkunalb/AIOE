@@ -2,14 +2,18 @@
 
 <!-- cSpell:ignore EWMA ewma multimodal fastflowlm llamacpp downloaders -->
 
-HMIR is a local LLM runtime for heterogeneous machines. The design target is simple to describe and hard to fake:
+> **Your hardware is smarter than your software. HMIR makes them match.**
 
-- Detect `NPU`, `GPU`, and `CPU` automatically.
-- Prefer `NPU` when it is the best fit.
-- Fall back cleanly to `GPU`, then `CPU`.
-- Expose one local API instead of making developers reason about per-device runtimes.
+NPUs entered consumer hardware in 2017, but software never caught up. **HMIR is that missing layer.** It is a silicon-aware inference runtime designed to orchestrate AI workloads across NPU, GPU, and CPU—prioritizing efficiency without sacrificing compatibility.
 
-This document turns that goal into a concrete, production-oriented system design for Windows, Linux, and macOS.
+## 🚀 The Mission
+
+1. **Detect** `NPU`, `GPU`, and `CPU` automatically.
+2. **Prefer** `NPU` for persistent, background, or low-power chat tasks.
+3. **Fall back** cleanly to `GPU`, then `CPU` for high-throughput or unsupported workloads.
+4. **Abstract** away vendor-specific complexity (OpenVINO, CUDA, Metal) into one local OpenAI-compatible endpoint.
+
+This document turns that visionary goal into a concrete, production-oriented system design.
 
 ## Recommended Positioning
 
