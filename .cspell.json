@@ -66,7 +66,10 @@
     "Radeon",
     "rocm",
     "MIGraphX",
-    "CoreML"
+    "CoreML",
+    "LUID",
+    "LUIDs",
+    "engtype"
   ],
   "ignorePaths": [
     "target",

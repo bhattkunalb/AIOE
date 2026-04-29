@@ -25,12 +25,12 @@
 
 <!-- Tabs -->
 <div class="nav-tabs">
-  <div class="nav-tab active" data-tab="overview" onclick="switchTab('overview')">📊 Overview</div>
-  <div class="nav-tab" data-tab="monitor" onclick="switchTab('monitor')">📡 Monitor</div>
-  <div class="nav-tab" data-tab="chat" onclick="switchTab('chat')">💬 Chat</div>
-  <div class="nav-tab" data-tab="models" onclick="switchTab('models')">🧠 Models</div>
-  <div class="nav-tab" data-tab="logs" onclick="switchTab('logs')">📋 Logs</div>
-  <div class="nav-tab" data-tab="connect" onclick="switchTab('connect')">🔗 Connect</div>
+  <button type="button" class="nav-tab active" data-tab="overview" onclick="switchTab('overview')">📊 Overview</button>
+  <button type="button" class="nav-tab" data-tab="monitor" onclick="switchTab('monitor')">📡 Monitor</button>
+  <button type="button" class="nav-tab" data-tab="chat" onclick="switchTab('chat')">💬 Chat</button>
+  <button type="button" class="nav-tab" data-tab="models" onclick="switchTab('models')">🧠 Models</button>
+  <button type="button" class="nav-tab" data-tab="logs" onclick="switchTab('logs')">📋 Logs</button>
+  <button type="button" class="nav-tab" data-tab="connect" onclick="switchTab('connect')">🔗 Connect</button>
 </div>
 
 <!-- Tab: Overview -->
@@ -115,31 +115,40 @@
     <div class="spec-card">
       <div class="spec-card-title"><span class="spec-icon">🔲</span> Processor</div>
       <table class="spec-table">
-        <tr><td>Model</td><td id="mon-cpu-model">—</td></tr>
-        <tr><td>Cores</td><td id="mon-cpu-cores">—</td></tr>
-        <tr><td>Threads</td><td id="mon-cpu-threads">—</td></tr>
-        <tr><td>L3 Cache</td><td id="mon-cpu-l3">—</td></tr>
-        <tr><td>Temp</td><td id="mon-cpu-temp">—</td></tr>
+        <thead><tr style="display:none"><th scope="col">Property</th><th scope="col">Value</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Model</th><td id="mon-cpu-model">—</td></tr>
+          <tr><th scope="row">Cores</th><td id="mon-cpu-cores">—</td></tr>
+          <tr><th scope="row">Threads</th><td id="mon-cpu-threads">—</td></tr>
+          <tr><th scope="row">L3 Cache</th><td id="mon-cpu-l3">—</td></tr>
+          <tr><th scope="row">Temp</th><td id="mon-cpu-temp">—</td></tr>
+        </tbody>
       </table>
     </div>
     <div class="spec-card">
       <div class="spec-card-title"><span class="spec-icon">🎮</span> Graphics</div>
       <table class="spec-table">
-        <tr><td>Model</td><td id="mon-gpu-model">—</td></tr>
-        <tr><td>Driver</td><td id="mon-gpu-driver">—</td></tr>
-        <tr><td>VRAM Ded.</td><td id="mon-gpu-vram-ded">—</td></tr>
-        <tr><td>VRAM Shared</td><td id="mon-gpu-vram-shr">—</td></tr>
-        <tr><td>Temp</td><td id="mon-gpu-temp">—</td></tr>
+        <thead><tr style="display:none"><th scope="col">Property</th><th scope="col">Value</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Model</th><td id="mon-gpu-model">—</td></tr>
+          <tr><th scope="row">Driver</th><td id="mon-gpu-driver">—</td></tr>
+          <tr><th scope="row">VRAM Ded.</th><td id="mon-gpu-vram-ded">—</td></tr>
+          <tr><th scope="row">VRAM Shared</th><td id="mon-gpu-vram-shr">—</td></tr>
+          <tr><th scope="row">Temp</th><td id="mon-gpu-temp">—</td></tr>
+        </tbody>
       </table>
     </div>
     <div class="spec-card">
       <div class="spec-card-title"><span class="spec-icon">🧠</span> Neural Processor</div>
       <table class="spec-table">
-        <tr><td>Model</td><td id="mon-npu-model">—</td></tr>
-        <tr><td>Driver</td><td id="mon-npu-driver">—</td></tr>
-        <tr><td>VRAM Used</td><td id="mon-npu-vram">—</td></tr>
-        <tr><td>Status</td><td id="mon-npu-status">—</td></tr>
-        <tr><td>Uptime</td><td id="mon-uptime">—</td></tr>
+        <thead><tr style="display:none"><th scope="col">Property</th><th scope="col">Value</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Model</th><td id="mon-npu-model">—</td></tr>
+          <tr><th scope="row">Driver</th><td id="mon-npu-driver">—</td></tr>
+          <tr><th scope="row">VRAM Used</th><td id="mon-npu-vram">—</td></tr>
+          <tr><th scope="row">Status</th><td id="mon-npu-status">—</td></tr>
+          <tr><th scope="row">Uptime</th><td id="mon-uptime">—</td></tr>
+        </tbody>
       </table>
     </div>
   </div>

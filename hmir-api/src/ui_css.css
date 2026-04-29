@@ -55,6 +55,7 @@ body {
   padding:8px 18px; border-radius:var(--radius-sm); cursor:pointer;
   font-size:13px; font-weight:500; color:var(--text-dim);
   border:1px solid transparent; transition:all 0.2s;
+  background:transparent; font-family:inherit; outline:none;
 }
 .nav-tab:hover { color:var(--text); background:rgba(255,255,255,0.04); }
 .nav-tab.active { color:var(--accent); background:rgba(0,242,255,0.08); border-color:var(--border); }
@@ -211,8 +212,9 @@ body {
 .spec-table {
   width:100%; font-family:var(--mono); font-size:12px; line-height:2;
 }
-.spec-table td:first-child {
+.spec-table th, .spec-table td:first-child {
   color:var(--text-dim); padding-right:12px; white-space:nowrap; width:40%;
+  text-align:left; font-weight:normal;
 }
 .spec-table td:last-child {
   color:var(--text-bright); font-weight:500;
@@ -284,9 +286,9 @@ body {
   padding:3px 10px; border-radius:12px; font-size:12px;
   font-weight:600; font-family:var(--mono);
 }
-.thermal-badge.cool { background:rgba(34,197,94,0.12); color:#22c55e; }
-.thermal-badge.warm { background:rgba(245,158,11,0.12); color:#f59e0b; }
-.thermal-badge.hot { background:rgba(239,68,68,0.12); color:#ef4444; }
+.thermal-badge.cool { background:#064e3b; color:#fff; }
+.thermal-badge.warm { background:#78350f; color:#fff; }
+.thermal-badge.hot { background:#7f1d1d; color:#fff; }
 
 /* Section dividers */
 .section-divider {
