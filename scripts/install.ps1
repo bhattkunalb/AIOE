@@ -422,7 +422,7 @@ function Install-PythonEnvironment {
 # ========================================
 # Shortcuts & Shell Integration
 # ========================================
-function Create-DesktopShortcut {
+function New-DesktopShortcut {
     param (
         [string]$Target,
         [string]$Name,
@@ -471,7 +471,7 @@ function Main {
     Update-UserPath
     
     # One-click Visual: Create Desktop Shortcut
-    Create-DesktopShortcut -Target "$InstallPath\hmir.exe" -Name "HMIR Dashboard" -Arguments "start"
+    New-DesktopShortcut -Target "$InstallPath\hmir.exe" -Name "HMIR Dashboard" -Arguments "start"
     
     $npuDetected = Test-NPUDrivers
     if (-not $npuDetected) {
