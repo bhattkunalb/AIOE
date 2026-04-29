@@ -113,6 +113,16 @@ irm https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.ps1 
 
 This script handles dependency checks, environment isolation, and creates a desktop shortcut for the **HMIR Dashboard**.
 
+### Linux / macOS (One-Click Installer)
+
+Open your terminal and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/bhattkunalb/HMIR/main/scripts/install.sh | bash
+```
+
+This will install the `hmir` tool to `~/.local/bin` and configure your PATH.
+
 ### Manual / Developer Setup
 
 1. Clone the repository: `git clone https://github.com/bhattkunalb/HMIR`
@@ -121,88 +131,30 @@ This script handles dependency checks, environment isolation, and creates a desk
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Quick Start & CLI Reference
 
-### 1. Probe the machine
+After installation, use the `hmir` command to manage your runtime.
 
-Automatically detect your silicon and get tailored model recommendations:
+### 1. Essential Workflow
 
-```bash
-hmir suggest
-```
+| Command | Description |
+| :--- | :--- |
+| `hmir suggest` | **Start here.** Detects hardware and recommends models. |
+| `hmir pull <name>` | Downloads an optimized model (e.g., `qwen2.5-1.5b-ov`). |
+| `hmir start` | Launches the API and the **Native Dashboard**. |
+| `hmir status` | Checks health, active models, and port status. |
+| `hmir smi` | Real-time **System Management Interface** (NPU/GPU/CPU). |
+| `hmir stop` | Gracefully stops all background workers and APIs. |
 
-### 2. Pull a compatible model
+### 2. Advanced Usage
 
-```bash
-# Intel NPU-friendly OpenVINO pack
-hmir pull qwen2.5-1.5b-ov
-
-# Cross-platform GGUF fallback
-hmir pull llama3.2-3b
-```
-
-### 3. Start the local API + Web Console
-
-```bash
-hmir start --model qwen2.5-1.5b-ov
-```
-
-This starts the API server and the **Native Desktop Dashboard**.
-
-### 3a. Headless mode (API only, no UI)
-
-```bash
-hmir start --headless --model qwen2.5-1.5b-ov
-```
-
-### 3b. Monitor Status & Hardware
-
-```bash
-hmir status
-hmir smi
-hmir stop
-```
-
-- `status`: High-level health and active model info.
-- `smi`: Detailed per-device utilization (NPU/GPU/CPU) and live process activity.
-- `stop`: Gracefully terminates all background inference nodes and worker services.
-
-This opens the high-fidelity **System Management Interface** to monitor your silicon in real-time.
-
-### 3d. Source Build Execution
-
-If you are developing or prefer to run directly from source instead of using the installed `hmir` binary, you can use Cargo:
-
-```bash
-cargo run --release -p hmir-cli -- start
-```
-
-### 4. Call the OpenAI-compatible endpoint
-
-```bash
-curl http://127.0.0.1:8080/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "messages": [{"role": "user", "content": "Summarize the active hardware route."}],
-    "stream": true
-  }'
-```
-
-### 5. Download a model (CLI)
-
-```bash
-hmir download OpenVINO/qwen2.5-1.5b-instruct-int4-ov
-```
-
-Progress bars show download speed, ETA, and percentage completion.
-
-### 6. Clean runtime caches
-
-```bash
-hmir clean
-```
-
-Purges stale OpenVINO and hardware acceleration caches to resolve loading errors.
+- **Start with a specific model**: `hmir start --model llama3.2-3b`
+- **Headless Mode**: `hmir start --headless` (API only, no UI).
+- **Web Console**: `hmir start --web` (Launches the legacy browser UI).
+- **Integration Help**: `hmir integrations` (Settings for Cursor/VS Code).
+- **Log Inspection**: `hmir logs --tail 100 --follow`
+- **System Reset**: `hmir clean` (Purges hardware caches if things get stuck).
+- **Full Uninstall**: `hmir uninstall` (Purges all data and binaries).
 
 ## How It Works
 
